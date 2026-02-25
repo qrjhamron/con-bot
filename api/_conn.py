@@ -337,8 +337,10 @@ def city_type(loc):
 
 def province_level_str(plv):
     """Describe province level."""
-    if plv >= 6:
+    if plv >= 7:
         return 'capital'
+    if plv == 6:
+        return 'major_city'
     if plv == 5:
         return 'city'
     if plv == 4:

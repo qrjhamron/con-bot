@@ -353,6 +353,35 @@ def get_enemy_provinces() -> dict:
     return result
 
 
+def find_cities(country: str) -> dict:
+    """Find all cities (plv>=4) owned by a country. Use country name or player ID."""
+    ctrl, ge, raw = refresh()
+    pid = _resolve_player(country)
+    if pid < 0:
+        return {'error': f'Country not found: {country}'}
+    locs = get_locations(raw)
+    players = get_players(raw)
+    nation = players.get(pid, {}).get('nationName', f'P{pid}')
+    cities = []
+    for loc in locs:
+        if not isinstance(loc, dict) or loc.get('o') != pid:
+            continue
+        plv = loc.get('plv', 0)
+        if plv < 4:
+            continue
+        cities.append({
+            'province_id': loc['id'],
+            'level': plv,
+            'level_str': province_level_str(plv),
+            'morale': loc.get('m', 0),
+            'type': city_type(loc),
+            'pos': loc.get('c', {}),
+        })
+    total_provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == pid)
+    return {'country': nation, 'player_id': pid, 'total_provinces': total_provs,
+            'cities': cities, 'city_count': len(cities)}
+
+
 def _resolve_player(name_or_id) -> int:
     try:
         return int(name_or_id)
@@ -1002,6 +1031,14 @@ TOOLS = [
         "description": "Get all enemy provinces (war targets and weak AI bots)",
         "fn": get_enemy_provinces,
         "parameters": {},
+    },
+    {
+        "name": "find_cities",
+        "description": "Find all cities owned by a country. Returns province IDs, levels, morale. Use country name (e.g. 'Mali', 'Libya') or player ID",
+        "fn": find_cities,
+        "parameters": {
+            "country": {"type": "string", "description": "Country name or player ID (e.g. 'Mali', 'Libya', '32')"},
+        },
     },
     {
         "name": "move_army",

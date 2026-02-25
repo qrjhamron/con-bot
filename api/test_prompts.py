@@ -185,6 +185,8 @@ def run_prompt_tests():
     print("\n── ARMY MOVEMENT ──")
     test("kirim semua army ke Ghana", ["move_all_idle_to_target"], "move all to Ghana")
     test("deploy army idle ke Mali", ["move_all_idle_to_target"], "deploy to Mali")
+    test("cari semua kota Mali", ["find_cities"], "find Mali cities")
+    test("kota apa aja yang dimiliki Libya?", ["find_cities"], "find Libya cities")
 
     # ═══════════════════════════════════════════════════════
     # Category 5: BUILDING (should call build tools)

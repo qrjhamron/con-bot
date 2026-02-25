@@ -39,6 +39,9 @@ ATURAN PENTING:
 8. Untuk SEMUA tool yang menerima player — kamu bisa pakai NAMA NEGARA (misal "Ghana", "Mali") atau angka ID.
 9. Jika user bilang "semua kota" atau "all cities", gunakan build_in_all_cities atau auto_produce, JANGAN loop manual.
 10. Jika aksi gagal, jelaskan kenapa dan sarankan alternatif.
+11. JANGAN PERNAH search web untuk cari province ID. Gunakan find_cities("nama_negara") untuk dapat province ID milik negara itu.
+12. Kalau user bilang "invasi Mali" atau "serang kota X", LANGSUNG panggil find_cities dulu, lalu move army ke province_id dari hasilnya.
+13. JANGAN kirim string sebagai province ID ke move_army. SELALU pakai angka dari find_cities atau get_enemy_provinces.
 
 KONTEKS:
 - Main sebagai Nigeria (P88) di Afrika
