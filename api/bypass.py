@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from _conn import (connect, get_locations, get_armies, get_players,
                     get_properties, army_units, army_hp, unit_name, building_name)
+from actions import _extract_ar
 
 
 def run_bypass(dry_run=False):
@@ -127,7 +128,7 @@ def run_bypass(dry_run=False):
         ctrl.refresh_state()
         locs = get_locations(ctrl.state)
         props = get_properties(ctrl.state)
-    except:
+    except Exception:
         pass
 
     for loc in locs:
@@ -154,7 +155,7 @@ def run_bypass(dry_run=False):
                     if ar == 1:
                         summary['production'].append(f"[PROD] P{pid}: {unit_name(uid)}")
                         break
-                except:
+                except Exception:
                     continue
             else:
                 summary['production'].append(f"[DRY] P{pid}: {unit_name(uid)}")
@@ -197,22 +198,13 @@ def run_bypass(dry_run=False):
                         if ar == 1:
                             summary['buildings'].append(f"[CONST] P{pid}: {building_name(bid)}")
                             break
-                    except:
+                    except Exception:
                         continue
                 else:
                     summary['buildings'].append(f"[DRY] P{pid}: {building_name(bid)}")
                     break
 
     return summary
-
-
-def _extract_ar(response):
-    res = response.get('result', response)
-    ar = res.get('actionResults', {})
-    for k, v in ar.items():
-        if k != '@c':
-            return v
-    return 0
 
 
 def print_summary(summary):

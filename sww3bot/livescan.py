@@ -374,7 +374,7 @@ def main():
                 time.sleep(30)
                 try:
                     scanner.login()
-                except:
+                except Exception:
                     pass
     else:
         # Single scan

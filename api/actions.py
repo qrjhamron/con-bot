@@ -357,12 +357,12 @@ def _resolve_player(name_or_id) -> int:
         un = p.get('name', '').lower()
         if name_lower == nn or name_lower == dn or name_lower == un:
             return pid
-    # Substring match requiring >50% length overlap
+    # Substring match requiring >75% length overlap to prevent "Niger" matching "Nigeria"
     for pid, p in players.items():
         nn = p.get('nationName', '').lower()
         dn = p.get('defaultNationName', '').lower()
-        if (name_lower in nn and len(name_lower) > len(nn) * 0.5) or \
-           (name_lower in dn and len(name_lower) > len(dn) * 0.5):
+        if (name_lower in nn and len(name_lower) > len(nn) * 0.75) or \
+           (name_lower in dn and len(name_lower) > len(dn) * 0.75):
             return pid
     return -1
 
@@ -513,7 +513,8 @@ def auto_conquer() -> dict:
                 'nation': nation, 'success': ar == 1,
             })
 
-    return {'deployed': len(moves), 'idle_remaining': len(idle) - len(moves), 'moves': moves}
+    successful = sum(1 for m in moves if m['success'])
+    return {'deployed': successful, 'idle_remaining': len(idle) - successful, 'moves': moves}
 
 
 def auto_produce() -> dict:
@@ -547,7 +548,7 @@ def auto_produce() -> dict:
                     results.append({'city_id': pid, 'unit': unit_name(uid), 'success': True})
                     produced = True
                     break
-            except:
+            except Exception:
                 continue
         if not produced:
             results.append({'city_id': pid, 'unit': None, 'success': False})
@@ -579,11 +580,20 @@ def build_in_all_cities(building_type: str) -> dict:
         if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
+        us = loc.get('us', [])
+        existing = set()
+        if isinstance(us, list) and len(us) > 1:
+            for b in us[1]:
+                if isinstance(b, dict):
+                    existing.add(b.get('id'))
+        if bid in existing:
+            results.append({'city_id': pid, 'success': True, 'skipped': 'already_built'})
+            continue
         try:
             r = ctrl.build_building(pid, bid)
             ar = _extract_ar(r)
             results.append({'city_id': pid, 'success': ar == 1})
-        except:
+        except Exception:
             results.append({'city_id': pid, 'success': False})
 
     built = sum(1 for r in results if r['success'])
@@ -610,7 +620,7 @@ def declare_war_on_all_bots() -> dict:
                 'player_id': pid, 'nation': p.get('nationName', ''),
                 'provinces': provs, 'success': ar == 1,
             })
-        except:
+        except Exception:
             pass
 
     return {'wars_declared': sum(1 for r in results if r['success']), 'details': results}
@@ -640,12 +650,12 @@ def start_research(research_id: int) -> dict:
         return {'success': False, 'error': str(e)}
 
 
-def deploy_spy(province_id: int) -> dict:
-    """Recruit and deploy a spy to a province."""
+def deploy_spy(province_id: int, mission_type: int = 0) -> dict:
+    """Recruit and deploy a spy to a province. mission_type: 0=economy, 1=military, 2=sabotage."""
     ctrl, ge, raw = _ensure()
     try:
-        r = ge.recruit_and_deploy_spy(province_id)
-        return {'success': True, 'province_id': province_id}
+        r = ge.recruit_and_deploy_spy(province_id, mission_type)
+        return {'success': r, 'province_id': province_id}
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
@@ -691,7 +701,7 @@ def auto_build_infrastructure() -> dict:
                     if ar == 1:
                         results.append({'city_id': pid, 'building': building_name(bid), 'success': True})
                         break
-                except:
+                except Exception:
                     continue
     return {'built': len(results), 'details': results}
 
@@ -838,6 +848,14 @@ def smart_expansion() -> dict:
         if isinstance(l, dict) and l.get('o') == 88:
             our_provs.add(l.get('id'))
 
+    # Our province positions for distance checks
+    our_positions = []
+    for l in locs:
+        if isinstance(l, dict) and l.get('o') == 88:
+            c = l.get('c', {})
+            if isinstance(c, dict):
+                our_positions.append((c.get('x', 0), c.get('y', 0)))
+
     # Find neighbors
     neighbor_owners = {}
     for l in locs:
@@ -847,16 +865,13 @@ def smart_expansion() -> dict:
         c = l.get('c', {})
         if not isinstance(c, dict):
             continue
-        # Check if bordering our territory
-        for op in [ol for ol in locs if isinstance(ol, dict) and ol.get('o') == 88]:
-            oc = op.get('c', {})
-            if isinstance(oc, dict):
-                d = math.hypot(c.get('x', 0) - oc.get('x', 0), c.get('y', 0) - oc.get('y', 0))
-                if d < 80:  # close enough to be neighbor
-                    if owner not in neighbor_owners:
-                        neighbor_owners[owner] = {'provs': 0, 'border_provs': []}
-                    neighbor_owners[owner]['border_provs'].append(l.get('id'))
-                    break
+        cx, cy = c.get('x', 0), c.get('y', 0)
+        for ox, oy in our_positions:
+            if math.hypot(cx - ox, cy - oy) < 80:
+                if owner not in neighbor_owners:
+                    neighbor_owners[owner] = {'provs': 0, 'border_provs': set()}
+                neighbor_owners[owner]['border_provs'].add(l.get('id'))
+                break
 
     # Count total provinces per neighbor
     for l in locs:
@@ -871,7 +886,7 @@ def smart_expansion() -> dict:
             'nation': p.get('nationName', ''),
             'is_bot': p.get('computerPlayer', False),
             'total_provinces': info['provs'],
-            'border_provinces': len(set(info['border_provs'])),
+            'border_provinces': len(info['border_provs']),
             'vp': p.get('vps', 0),
             'difficulty': 'EASY' if p.get('computerPlayer') and info['provs'] <= 10 else
                          'MEDIUM' if info['provs'] <= 20 else 'HARD',
@@ -1079,10 +1094,11 @@ TOOLS = [
     },
     {
         "name": "deploy_spy",
-        "description": "Recruit and deploy a spy to a province",
+        "description": "Recruit and deploy a spy to a province. mission_type: 0=economy, 1=military, 2=sabotage",
         "fn": deploy_spy,
         "parameters": {
             "province_id": {"type": "integer", "description": "Province to spy on"},
+            "mission_type": {"type": "integer", "description": "0=economy, 1=military, 2=sabotage (default: 0)"},
         },
     },
     {

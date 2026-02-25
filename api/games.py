@@ -55,7 +55,7 @@ def list_games():
             )
             if r.ok:
                 games = r.json().get('games', [])
-        except:
+        except Exception:
             pass
 
     cfg = load_config()

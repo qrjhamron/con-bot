@@ -180,7 +180,7 @@ class SWW3Agent:
                                 response = self.chat.send_message(user_message)
                                 switched = True
                                 break
-                            except:
+                            except Exception:
                                 continue
                         if switched:
                             break

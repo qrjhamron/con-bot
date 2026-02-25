@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Terminal UI agent using Gradient SDK (OpenAI-compatible)."""
 
-import sys, os, json, time, traceback, textwrap, threading, re
+import sys, os, json, time, traceback, textwrap, re
 
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -104,8 +104,6 @@ def search_web(query: str) -> dict:
             timeout=10,
         )
         results = []
-        # Simple parsing of DuckDuckGo HTML results
-        import re
         for match in re.finditer(r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>', r.text):
             url, title = match.groups()
             title = re.sub(r'<[^>]+>', '', title).strip()
@@ -204,9 +202,17 @@ class GradientAgent:
 
         return None
 
+    def _trim_history(self, max_messages=40):
+        """Keep conversation history bounded to prevent token overflow."""
+        if len(self.messages) <= max_messages:
+            return
+        # Keep system prompt + last N messages
+        self.messages = [self.messages[0]] + self.messages[-(max_messages - 1):]
+
     def execute(self, user_message: str) -> str:
         """Process user message, execute tools, return response."""
         self.messages.append({'role': 'user', 'content': user_message})
+        self._trim_history()
 
         max_rounds = 10
         for round_num in range(max_rounds):
@@ -229,7 +235,7 @@ class GradientAgent:
                     name = fn.get('name', '')
                     try:
                         args = json.loads(fn.get('arguments', '{}'))
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         args = {}
                     tc_id = tc.get('id', f'call_{round_num}')
 
@@ -450,7 +456,7 @@ def _tui_main(stdscr, agent):
     while True:
         try:
             ch = stdscr.getch()
-        except:
+        except (KeyboardInterrupt, Exception):
             break
 
         if ch == curses.KEY_RESIZE:
@@ -507,7 +513,6 @@ def _tui_main(stdscr, agent):
             try:
                 result = agent.execute(cmd)
                 add_output(f"\n[BOT] Agent >\n{result}", 8)
-                # Try to extract game info from status results
                 if 'day' in str(agent.messages[-2:]).lower():
                     try:
                         for m in reversed(agent.messages):
@@ -518,7 +523,7 @@ def _tui_main(stdscr, agent):
                                     game_info['vp'] = data.get('vp', '?')
                                     game_info['provs'] = data.get('provinces', '?')
                                     break
-                    except:
+                    except (json.JSONDecodeError, KeyError, TypeError):
                         pass
             except Exception as e:
                 add_output(f"\n[ERR] Error: {e}", 4)
