@@ -47,13 +47,13 @@ def main():
         rid = RESOURCE_MAP[args.resource]
         result = ctrl.buy_resource(rid, args.amount, args.price)
         ar = ctrl._extract_action_result(result)
-        print(f"{'✅' if ar in [0,1] else '❌'} Buy {args.amount} {args.resource} @{args.price} (ar={ar})")
+        print(f"{'OK' if ar in [0,1] else 'FAIL'} Buy {args.amount} {args.resource} @{args.price} (ar={ar})")
     
     elif args.cmd == 'sell':
         rid = RESOURCE_MAP[args.resource]
         result = ctrl.sell_resource(rid, args.amount, args.price)
         ar = ctrl._extract_action_result(result)
-        print(f"{'✅' if ar in [0,1] else '❌'} Sell {args.amount} {args.resource} @{args.price} (ar={ar})")
+        print(f"{'OK' if ar in [0,1] else 'FAIL'} Sell {args.amount} {args.resource} @{args.price} (ar={ar})")
 
 if __name__ == '__main__':
     main()

@@ -20,7 +20,7 @@ def main():
     rel_val = RELATIONS[args.relation]
     result = ctrl.change_relation(args.player, rel_val)
     ar = ctrl._extract_action_result(result)
-    print(f"{'✅' if ar in [0,1] else '❌'} {args.relation.upper()} with P{args.player} (ar={ar})")
+    print(f"{'OK' if ar in [0,1] else 'FAIL'} {args.relation.upper()} with P{args.player} (ar={ar})")
 
 if __name__ == '__main__':
     main()

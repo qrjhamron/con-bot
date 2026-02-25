@@ -48,8 +48,8 @@ def main():
                     p1, p2 = w.get('player1', 0), w.get('player2', 0)
                     if p1 == 88: our_rels[str(p2)] = -2
                     elif p2 == 88: our_rels[str(p1)] = -2
-    rel_names = {-2:'⚔WAR', -1:'CEASE', 0:'EMBARGO', 1:'PEACE',
-                 2:'NAP', 3:'ROW', 4:'MIL', 5:'PROT', 6:'🔍INTEL', 7:'👑CMD'}
+    rel_names = {-2:'WARWAR', -1:'CEASE', 0:'EMBARGO', 1:'PEACE',
+                 2:'NAP', 3:'ROW', 4:'MIL', 5:'PROT', 6:'INTEL', 7:'CMD'}
     
     items = []
     for pid, p in players.items():
@@ -74,8 +74,8 @@ def main():
         name = p.get('name', '?')
         rel = our_rels.get(str(pid), our_rels.get(pid, None))
         rel_str = rel_names.get(rel, '') if rel is not None else ''
-        ai = ' 🤖' if p.get('computerPlayer') else ''
-        marker = ' ⭐' if pid == 88 else (' 👤' if pid == 87 else '')
+        ai = ' [AI]' if p.get('computerPlayer') else ''
+        marker = ' *' if pid == 88 else (' >' if pid == 87 else '')
         print(f"{i:>3} {nation:<22} {vp:>5} {provs:>6} {rel_str:<10} {name}{ai}{marker}")
 
 if __name__ == '__main__':

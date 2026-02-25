@@ -43,7 +43,7 @@ class PlayerTrend:
     points_per_day: float = 0     # Growth rate
     provinces_per_day: float = 0
     trend: str = "stable"          # growing / stable / declining / dead
-    trend_icon: str = "➡️"
+    trend_icon: str = ">"
     rank: int = 0
     rank_change: int = 0           # +N = improved, -N = dropped
     estimated_win_day: Optional[int] = None  # When they'll reach victory points
@@ -131,19 +131,19 @@ class ScoreTracker:
 
                 if trend.points_per_day > 20:
                     trend.trend = "growing"
-                    trend.trend_icon = "📈"
+                    trend.trend_icon = ""
                 elif trend.points_per_day < -5:
                     trend.trend = "declining"
-                    trend.trend_icon = "📉"
+                    trend.trend_icon = ""
                 elif not snap.is_active:
                     trend.trend = "dead"
-                    trend.trend_icon = "💀"
+                    trend.trend_icon = ""
                 elif snap.is_ai:
                     trend.trend = "ai"
-                    trend.trend_icon = "🤖"
+                    trend.trend_icon = "[AI]"
                 else:
                     trend.trend = "stable"
-                    trend.trend_icon = "➡️"
+                    trend.trend_icon = ">"
 
             # Previous rank (from first snapshot)
             if first_snap:
@@ -164,24 +164,24 @@ class ScoreTracker:
             # Elimination risk
             if snap.provinces <= 2 and snap.is_active:
                 trend.elimination_risk = 90
-                trend.notes.append("🚨 About to be eliminated!")
+                trend.notes.append("About to be eliminated!")
             elif snap.provinces <= 5 and trend.provinces_per_day < 0:
                 trend.elimination_risk = 60
-                trend.notes.append("⚠️ Losing territory fast")
+                trend.notes.append("Losing territory fast")
             elif snap.is_ai:
                 trend.elimination_risk = 80
-                trend.notes.append("🤖 AI player — free territory")
+                trend.notes.append("AI player — free territory")
             elif not snap.is_active:
                 trend.elimination_risk = 100
-                trend.notes.append("💀 Eliminated")
+                trend.notes.append(" Eliminated")
             else:
                 trend.elimination_risk = max(0, 30 - snap.provinces * 2)
 
             # Additional notes
             if trend.points_per_day > 50:
-                trend.notes.append(f"🔥 Fastest grower! +{trend.points_per_day:.0f} pts/day")
+                trend.notes.append(f" Fastest grower! +{trend.points_per_day:.0f} pts/day")
             if snap.provinces > 15:
-                trend.notes.append(f"🌍 Superpower — {snap.provinces} provinces")
+                trend.notes.append(f" Superpower — {snap.provinces} provinces")
 
             trends.append(trend)
 
@@ -201,7 +201,7 @@ class ScoreTracker:
         day = self.state.day
 
         lines = [
-            f"🏆 SCOREBOARD — Day {day}",
+            f"SCOREBOARD — Day {day}",
             "=" * 65,
             "",
             f"{'#':<3} {'Trend':<3} {'Player':<18} {'Points':>7} {'Provs':>5} "
@@ -223,11 +223,11 @@ class ScoreTracker:
 
             # Elimination risk bar
             if t.elimination_risk >= 70:
-                risk = "🔴 HIGH"
+                risk = " HIGH"
             elif t.elimination_risk >= 30:
-                risk = "🟡 MED"
+                risk = " MED"
             else:
-                risk = "🟢 LOW"
+                risk = " LOW"
 
             growth_str = f"+{t.points_per_day:.0f}/d" if t.points_per_day > 0 else f"{t.points_per_day:.0f}/d"
 
@@ -241,14 +241,14 @@ class ScoreTracker:
         winner = self.predict_winner()
         if winner:
             lines.append(
-                f"🔮 PREDICTED WINNER: {winner.name} — estimated victory on Day {winner.estimated_win_day}"
+                f" PREDICTED WINNER: {winner.name} — estimated victory on Day {winner.estimated_win_day}"
             )
             lines.append(
                 f"   (growing at +{winner.points_per_day:.0f} pts/day, "
                 f"target: {self.victory_target} pts)"
             )
         else:
-            lines.append("🔮 No clear victory prediction yet — need more data points")
+            lines.append(" No clear victory prediction yet — need more data points")
 
         # Notable events
         lines.append("")
@@ -260,7 +260,7 @@ class ScoreTracker:
         free = [t for t in trends if t.trend in ("ai", "dead") and t.current_provinces > 0]
         if free:
             lines.append("")
-            lines.append("🏴 FREE TERRITORY (grab these!)")
+            lines.append(" FREE TERRITORY (grab these!)")
             for t in free:
                 lines.append(f"  {t.trend_icon} {t.name} ({t.country}) — {t.current_provinces} provinces up for grabs")
 

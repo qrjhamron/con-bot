@@ -23,10 +23,10 @@ def main():
                 cities.append(loc)
     
     if not cities:
-        print("All cities are already producing! 🏭")
+        print("All cities are already producing! [PROD]")
         return
     
-    print(f"🏭 {len(cities)} idle cities found")
+    print(f"[PROD] {len(cities)} idle cities found")
     
     for city in cities:
         pid = city.get('id', 0)
@@ -60,7 +60,7 @@ def main():
                 result = ctrl.produce_unit(pid, ut, template=item)
                 ar = ctrl._extract_action_result(result)
                 if ar == 1:
-                    print(f"  ✅ P{pid}: {unit_name(ut)} started!")
+                    print(f"  P{pid}: {unit_name(ut)} started!")
                     success = True
                     break
             except Exception:
@@ -68,7 +68,7 @@ def main():
             time.sleep(0.3)
         
         if not success and not args.dry:
-            print(f"  ❌ P{pid}: All units failed (low resources?)")
+            print(f"  P{pid}: All units failed (low resources?)")
 
 if __name__ == '__main__':
     main()

@@ -219,18 +219,18 @@ class GameFinder:
     def _recommend(self, g: GameListing) -> str:
         """Generate recommendation text."""
         if g.win_score >= 70:
-            return "🟢 STRONG PICK — High win potential!"
+            return " STRONG PICK — High win potential!"
         elif g.win_score >= 50:
-            return "🟡 GOOD — Decent opportunity"
+            return " GOOD — Decent opportunity"
         elif g.win_score >= 30:
-            return "🟠 OKAY — Some challenges expected"
+            return "~ OKAY — Some challenges expected"
         else:
-            return "🔴 SKIP — Tough game, find another"
+            return " SKIP — Tough game, find another"
 
     def render_results(self, result: GameSearchResult) -> str:
         """Render game search results."""
         lines = [
-            "🔍 GAME FINDER RESULTS",
+            " GAME FINDER RESULTS",
             "=" * 70,
             f"  Found: {result.total_found} games",
             f"  Filters: speed={result.filters_used.get('speed', 'any')}, "
@@ -241,7 +241,7 @@ class GameFinder:
         if result.best_pick:
             bp = result.best_pick
             lines.extend([
-                "  ⭐ BEST PICK",
+                "  * BEST PICK",
                 f"    {bp.name} (#{bp.game_id})",
                 f"    {bp.scenario} | {bp.speed} | Day {bp.game_day} | "
                 f"{bp.current_players}/{bp.max_players} players",
@@ -254,8 +254,8 @@ class GameFinder:
         lines.append(f"  {'─'*28} {'─'*5} {'─'*4} {'─'*9} {'─'*5} {'─'*6}")
 
         for g in result.games[:15]:
-            score_icon = "🟢" if g.win_score >= 70 else "🟡" if g.win_score >= 50 else "🟠" if g.win_score >= 30 else "🔴"
-            alliance = "⚔️" if g.is_alliance else "  "
+            score_icon = "" if g.win_score >= 70 else "" if g.win_score >= 50 else "~" if g.win_score >= 30 else ""
+            alliance = "" if g.is_alliance else "  "
             lines.append(
                 f"  {g.name:<28} {g.speed:>5} {g.game_day:>4} "
                 f"{g.current_players:>3}/{g.max_players:<3}{alliance} "

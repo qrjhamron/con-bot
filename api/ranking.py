@@ -32,7 +32,7 @@ def main():
         vp = p.get('vps', 0)
         provs = prov_counts.get(pid, 0)
         name = p.get('name', '?')
-        marker = ' ⭐' if pid == 88 else (' 👤' if pid == 87 else '')
+        marker = ' *' if pid == 88 else (' >' if pid == 87 else '')
         print(f"{i:>3} {nation:<22} {vp:>5} {provs:>6} {name:<20}{marker}")
 
 if __name__ == '__main__':

@@ -526,20 +526,20 @@ class BattlefieldIntel:
         """Render full battlefield intelligence report."""
         snap = snap or self._snapshot
         lines = [
-            f"⚔️ BATTLEFIELD INTELLIGENCE — Day {snap.game_day}",
+            f"BATTLEFIELD INTELLIGENCE — Day {snap.game_day}",
             "=" * 70,
             "",
         ]
 
         # Player overview with faction & army counts
-        lines.append("👥 PLAYER INTEL (factions, armies, strength)")
+        lines.append(" PLAYER INTEL (factions, armies, strength)")
         lines.append(f"  {'Player':<18} {'Faction':<10} {'Armies':>6} {'Str':>6} "
                      f"{'Moving':>6} {'Atk':>4} {'Prov':>5} {'VP':>4} {'AI?'}")
         lines.append(f"  {'─'*18} {'─'*10} {'─'*6} {'─'*6} {'─'*6} {'─'*4} {'─'*5} {'─'*4} {'─'*3}")
         for pid, pi in sorted(snap.players.items(), key=lambda x: x[1].total_strength, reverse=True):
-            is_me = "★" if pid in self.my_ids else " "
-            ai = "🤖" if pi.is_ai else "  "
-            dead = "💀" if pi.defeated else ""
+            is_me = "*" if pid in self.my_ids else " "
+            ai = "[AI]" if pi.is_ai else "  "
+            dead = "" if pi.defeated else ""
             lines.append(
                 f" {is_me}{pi.name:<18} {pi.faction_name:<10} {pi.total_armies:>6} "
                 f"{pi.total_strength:>6.0f} {pi.armies_moving:>6} {pi.armies_attacking:>4} "
@@ -548,7 +548,7 @@ class BattlefieldIntel:
         lines.append("")
 
         # Enemy army composition (THE KEY EXPLOIT)
-        lines.append("🔍 ENEMY ARMY COMPOSITION (hidden by game UI!)")
+        lines.append(" ENEMY ARMY COMPOSITION (hidden by game UI!)")
         unit_types_map = {
             10: "Infantry", 20: "Mot. Inf", 30: "Lt Armor",
             40: "MBT", 50: "Artillery", 60: "SAM",
@@ -568,22 +568,22 @@ class BattlefieldIntel:
         moving = [(aid, a) for aid, a in snap.armies.items()
                   if a.is_moving and a.owner_id not in self.my_ids]
         if moving:
-            lines.append(f"🚨 ENEMY MOVEMENTS ({len(moving)} armies moving!)")
+            lines.append(f"ENEMY MOVEMENTS ({len(moving)} armies moving!)")
             for aid, a in sorted(moving, key=lambda x: x[1].total_strength, reverse=True)[:10]:
-                icon = "⚔️" if a.is_attacking else "→"
+                icon = "" if a.is_attacking else "→"
                 lines.append(
                     f"  {icon} {a.owner_name} #{aid}: {a.total_strength:.0f} str "
                     f"[{a.command_type}] → ({a.target_x:.0f},{a.target_y:.0f}) "
-                    f"{'✈️' if a.is_airborne else '🚢' if a.is_naval else '🚗'}"
+                    f"{'' if a.is_airborne else '' if a.is_naval else ''}"
                 )
             lines.append("")
 
         # Incoming attacks
         if snap.incoming_attacks:
-            lines.append(f"🔴 INCOMING ATTACKS ON YOUR TERRITORY!")
+            lines.append(f" INCOMING ATTACKS ON YOUR TERRITORY!")
             for atk in snap.incoming_attacks:
                 lines.append(
-                    f"  🚨 {atk['owner']} army #{atk['army_id']}: "
+                    f"  {atk['owner']} army #{atk['army_id']}: "
                     f"{atk['strength']:.0f} strength, {atk['units']} unit types "
                     f"→ target {atk['target']}"
                 )
@@ -592,18 +592,18 @@ class BattlefieldIntel:
         # Trade intelligence (what enemies NEED)
         enemy_trades = [t for t in snap.trades if t.player_id not in self.my_ids]
         if enemy_trades:
-            lines.append("💰 ENEMY TRADE ORDERS (what they lack!)")
+            lines.append(" ENEMY TRADE ORDERS (what they lack!)")
             buys = [t for t in enemy_trades if t.is_buy]
             sells = [t for t in enemy_trades if not t.is_buy]
             if buys:
-                lines.append("  🔴 BUYING (= they NEED this!):")
+                lines.append("   BUYING (= they NEED this!):")
                 for t in buys:
                     lines.append(
                         f"    {t.player_name} buying {t.amount} {t.resource_name} "
                         f"@ ${t.limit_price:.2f}"
                     )
             if sells:
-                lines.append("  🟢 SELLING (= they have EXCESS):")
+                lines.append("   SELLING (= they have EXCESS):")
                 for t in sells:
                     lines.append(
                         f"    {t.player_name} selling {t.amount} {t.resource_name} "
@@ -613,11 +613,11 @@ class BattlefieldIntel:
 
         # Vulnerable targets
         if snap.vulnerable_targets:
-            lines.append(f"🎯 VULNERABLE ENEMY PROVINCES ({len(snap.vulnerable_targets)})")
+            lines.append(f"VULNERABLE ENEMY PROVINCES ({len(snap.vulnerable_targets)})")
             for v in sorted(snap.vulnerable_targets, key=lambda x: x["morale"])[:10]:
                 owner = snap.players.get(v["owner_id"])
                 oname = owner.name if owner else "?"
-                garrison = "🏰" if v["has_garrison"] else "⚠️ UNDEFENDED"
+                garrison = "[G]" if v["has_garrison"] else "UNDEFENDED"
                 lines.append(
                     f"  Province #{v['province_id']} ({oname}): "
                     f"morale {v['morale']}%, VP={v['vp']} {garrison}"
@@ -625,37 +625,37 @@ class BattlefieldIntel:
             lines.append("")
 
         # Online estimation
-        lines.append("📡 PLAYER ACTIVITY ESTIMATION")
+        lines.append("PLAYER ACTIVITY ESTIMATION")
         for pid, pi in snap.players.items():
             if pid in self.my_ids:
                 continue
             if pi.defeated:
-                status = "💀 ELIMINATED"
+                status = " ELIMINATED"
             elif pi.is_ai:
-                status = "🤖 AI CONTROLLED"
+                status = "AI CONTROLLED"
             elif pi.armies_moving > 0 or pi.armies_attacking > 0:
-                status = f"🟢 ACTIVE ({pi.armies_moving} moving, {pi.armies_attacking} attacking)"
+                status = f" ACTIVE ({pi.armies_moving} moving, {pi.armies_attacking} attacking)"
             elif pi.active_trades:
-                status = "🟡 RECENTLY ACTIVE (has trade orders)"
+                status = " RECENTLY ACTIVE (has trade orders)"
             else:
-                status = "🔴 INACTIVE / OFFLINE"
+                status = " INACTIVE / OFFLINE"
             lines.append(f"  {pi.name}: {status}")
         lines.append("")
 
         # Key findings
-        lines.append("📋 KEY INTELLIGENCE FINDINGS")
+        lines.append("KEY INTELLIGENCE FINDINGS")
         biggest = max(snap.players.values(), key=lambda p: p.total_strength) if snap.players else None
         if biggest:
-            lines.append(f"  💪 Strongest: {biggest.name} ({biggest.total_strength:.0f} total strength)")
+            lines.append(f"   Strongest: {biggest.name} ({biggest.total_strength:.0f} total strength)")
         most_active = max(snap.players.values(), key=lambda p: p.armies_moving) if snap.players else None
         if most_active and most_active.armies_moving > 0:
-            lines.append(f"  🏃 Most active: {most_active.name} ({most_active.armies_moving} armies on the move)")
+            lines.append(f"   Most active: {most_active.name} ({most_active.armies_moving} armies on the move)")
         # Resource weakness detection from trades
         for pid, pi in snap.players.items():
             if pid in self.my_ids:
                 continue
             buy_resources = [t.resource_name for t in pi.active_trades if t.is_buy]
             if buy_resources:
-                lines.append(f"  💸 {pi.name} SHORT on: {', '.join(set(buy_resources))}")
+                lines.append(f"   {pi.name} SHORT on: {', '.join(set(buy_resources))}")
 
         return "\n".join(lines)

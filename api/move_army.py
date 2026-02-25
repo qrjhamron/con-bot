@@ -14,9 +14,9 @@ def main():
     result = ctrl.move_army(args.army_id, args.target)
     ar = ctrl._extract_action_result(result)
     if ar == 1:
-        print(f"✅ Army #{args.army_id} moving to P{args.target}")
+        print(f"Army #{args.army_id} moving to P{args.target}")
     else:
-        print(f"❌ Failed (ar={ar})")
+        print(f"Failed (ar={ar})")
 
 if __name__ == '__main__':
     main()

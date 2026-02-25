@@ -148,7 +148,7 @@ class BytroAuth:
         self.auth_token = result["auth_token"]
         self.uber_auth = result.get("uber_auth")
 
-        logger.info("✅ Logged in as %s (ID: %s)", username, self.user_id)
+        logger.info("Logged in as %s (ID: %s)", username, self.user_id)
         return result
 
     def get_game_auth(self, game_id: int, player_id: int = 0) -> dict:
@@ -307,7 +307,6 @@ class AuthError(Exception):
     pass
 
 
-# ── Config Management ─────────────────────────────────────
 
 def save_config(
     username: str,
@@ -361,7 +360,6 @@ def delete_config():
         logger.info("Config deleted.")
 
 
-# ── Interactive Setup ─────────────────────────────────────
 
 def interactive_setup() -> dict:
     """
@@ -369,13 +367,13 @@ def interactive_setup() -> dict:
     Handles login + game selection + saves config.
     """
     print()
-    print("🔧 SUPREMACY WW3 BOT — SETUP")
+    print(" SUPREMACY WW3 BOT — SETUP")
     print("=" * 40)
 
     # Check existing config
     existing = load_config()
     if existing and existing.get("auth_token"):
-        print(f"📋 Existing config found: {existing.get('username')}")
+        print(f"Existing config found: {existing.get('username')}")
         print(f"   Game ID: {existing.get('game_id', 'not set')}")
         choice = input("   Use existing? [Y/n]: ").strip().lower()
         if choice != "n":
@@ -383,7 +381,7 @@ def interactive_setup() -> dict:
 
     # Login
     print()
-    print("🔑 Login to your Bytro account")
+    print("Login to your Bytro account")
     print("   (same as conflictnations.com / supremacy1914.com)")
     print()
     username = input("   Username: ").strip()
@@ -392,13 +390,13 @@ def interactive_setup() -> dict:
     auth = BytroAuth(game="ww3")
     try:
         result = auth.login(username, password)
-        print(f"   ✅ Logged in! (User ID: {auth.user_id})")
+        print(f"   Logged in! (User ID: {auth.user_id})")
         if result.get("initial_game_id"):
-            print(f"   🎮 Found game: {result['initial_game_id']}")
+            print(f"   Found game: {result['initial_game_id']}")
     except AuthError as e:
-        print(f"   ❌ Login failed: {e}")
+        print(f"   Login failed: {e}")
         print()
-        print("   💡 Alternative: paste your auth token manually")
+        print("    Alternative: paste your auth token manually")
         print("      (F12 → Network → find request to xgs*.c.bytro.com)")
         print("      Look for 'userAuth' in the request body")
         auth_token = input("   Auth token (or 'skip'): ").strip()
@@ -419,7 +417,7 @@ def interactive_setup() -> dict:
 
     if not game_id:
         print()
-        print("   💡 Enter your game ID:")
+        print("    Enter your game ID:")
         print("      (visible in browser URL bar when you're in a game,")
         print("       or from F12 → Network → gameID in requests)")
         game_id = input("   Game ID: ").strip()
@@ -437,7 +435,7 @@ def interactive_setup() -> dict:
     )
 
     print()
-    print(f"💾 Config saved to {CONFIG_FILE}")
+    print(f"Config saved to {CONFIG_FILE}")
     print("   You won't need to login again!")
     print()
     return config

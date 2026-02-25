@@ -86,7 +86,6 @@ class DiplomacyAdvisor:
         self.spy = SpyMaster(game_state, previous_state, my_player_ids)
         self._enemy_intel = self.spy.scan_enemy_troops()
 
-    # ── Threat Assessment ────────────────────────────
 
     def assess_threats(self) -> list[ThreatAssessment]:
         """Calculate threat score for every player."""
@@ -153,26 +152,26 @@ class DiplomacyAdvisor:
 
             # Reasons
             if ta.aggression > 0.5:
-                ta.reasons.append(f"🚨 {ta.aggression*100:.0f}% of troops near YOUR border!")
+                ta.reasons.append(f"{ta.aggression*100:.0f}% of troops near YOUR border!")
             if power_ratio > 1.5:
-                ta.reasons.append(f"💪 {power_ratio:.1f}x stronger than you militarily")
+                ta.reasons.append(f" {power_ratio:.1f}x stronger than you militarily")
             elif power_ratio < 0.5:
-                ta.reasons.append(f"💀 Weak — only {power_ratio:.1f}x your strength")
+                ta.reasons.append(f" Weak — only {power_ratio:.1f}x your strength")
             if ta.tech_level == "elite":
-                ta.reasons.append("🏗️ Has elite tech (army base)")
+                ta.reasons.append("[CONST] Has elite tech (army base)")
             if border_count > 3:
-                ta.reasons.append(f"📍 Long shared border ({border_count} provinces)")
+                ta.reasons.append(f" Long shared border ({border_count} provinces)")
 
             # Recommendation
             if ta.threat_score >= 70:
                 ta.recommended_action = "ally_or_preemptive"
-                ta.reasons.append("⚔️ ALLY or STRIKE FIRST — very dangerous")
+                ta.reasons.append("ALLY or STRIKE FIRST — very dangerous")
             elif ta.threat_score >= 40:
                 ta.recommended_action = "watch"
-                ta.reasons.append("👁️ Watch closely — potential threat")
+                ta.reasons.append(" Watch closely — potential threat")
             elif power_ratio < 0.5 and border_count > 0:
                 ta.recommended_action = "attack"
-                ta.reasons.append("🎯 Weak neighbor — good target")
+                ta.reasons.append("Weak neighbor — good target")
             else:
                 ta.recommended_action = "ignore"
 
@@ -180,7 +179,6 @@ class DiplomacyAdvisor:
 
         return sorted(threats, key=lambda t: t.threat_score, reverse=True)
 
-    # ── Ally Recommendation ──────────────────────────
 
     def recommend_allies(self) -> list[AllyCandidate]:
         """Find best ally candidates based on position and mutual benefit."""
@@ -202,10 +200,10 @@ class DiplomacyAdvisor:
             # Don't ally with aggressive neighbors
             if ta.aggression > 0.5:
                 score -= 30
-                ac.reasons.append("❌ Aggressive toward you — risky ally")
+                ac.reasons.append("Aggressive toward you — risky ally")
             elif ta.aggression < 0.1:
                 score += 10
-                ac.reasons.append("✅ Not aggressive toward you")
+                ac.reasons.append("Not aggressive toward you")
 
             # Prefer allies who share enemies (enemy of my enemy)
             mutual_enemy_count = 0
@@ -220,28 +218,27 @@ class DiplomacyAdvisor:
             ac.mutual_enemies = mutual_enemy_count
             score += mutual_enemy_count * 10
             if mutual_enemy_count > 0:
-                ac.reasons.append(f"🤝 {mutual_enemy_count} shared threats — alliance makes sense")
+                ac.reasons.append(f"{mutual_enemy_count} shared threats — alliance makes sense")
 
             # Prefer non-adjacent allies (less chance of conflict)
             if ta.distance > 5:
                 score += 15
-                ac.reasons.append("📍 Far away — low conflict risk")
+                ac.reasons.append(" Far away — low conflict risk")
             elif ta.distance < 2:
                 score -= 10
                 ac.border_overlap = True
-                ac.reasons.append("⚠️ Very close — border conflicts possible")
+                ac.reasons.append("Very close — border conflicts possible")
 
             # Strong allies are more valuable
             if ta.military_power > 50:
                 score += 10
-                ac.reasons.append("💪 Strong military — useful ally")
+                ac.reasons.append(" Strong military — useful ally")
 
             ac.score = max(0, min(100, score))
             candidates.append(ac)
 
         return sorted(candidates, key=lambda c: c.score, reverse=True)
 
-    # ── War Target Selection ─────────────────────────
 
     def recommend_war_targets(self) -> list[WarTarget]:
         """Find best targets for offensive action."""
@@ -278,37 +275,36 @@ class DiplomacyAdvisor:
             score = 50
             if wt.strength_ratio > 2:
                 score += 25
-                wt.reasons.append(f"💪 You're {wt.strength_ratio:.1f}x stronger")
+                wt.reasons.append(f" You're {wt.strength_ratio:.1f}x stronger")
                 wt.risk = "low"
             elif wt.strength_ratio > 1:
                 score += 10
                 wt.risk = "medium"
             else:
                 score -= 20
-                wt.reasons.append(f"⚠️ They're stronger ({1/wt.strength_ratio:.1f}x)")
+                wt.reasons.append(f"They're stronger ({1/wt.strength_ratio:.1f}x)")
                 wt.risk = "high"
 
             if valuable > 0:
                 score += valuable * 10
-                wt.reasons.append(f"💎 {valuable} valuable provinces (double res / coastal)")
+                wt.reasons.append(f" {valuable} valuable provinces (double res / coastal)")
 
             if len(enemy_provs) <= 5:
                 score += 10
-                wt.reasons.append("🎯 Small nation — quick conquest")
+                wt.reasons.append("Small nation — quick conquest")
 
             if ta.tech_level == "basic":
                 score += 10
-                wt.reasons.append("💤 Low tech — no advanced units")
+                wt.reasons.append("Low tech — no advanced units")
             elif ta.tech_level == "elite":
                 score -= 15
-                wt.reasons.append("🏗️ High tech — expect strong resistance")
+                wt.reasons.append("[CONST] High tech — expect strong resistance")
 
             wt.score = max(0, min(100, score))
             targets.append(wt)
 
         return sorted(targets, key=lambda t: t.score, reverse=True)
 
-    # ── Betrayal Detection ───────────────────────────
 
     def detect_betrayal_signals(self, ally_ids: Optional[set] = None) -> list[str]:
         """
@@ -338,7 +334,7 @@ class DiplomacyAdvisor:
 
             if troops_near > 30:
                 signals.append(
-                    f"🚨 BETRAYAL SIGNAL: {intel.name} has {troops_near:.0f} troops "
+                    f"BETRAYAL SIGNAL: {intel.name} has {troops_near:.0f} troops "
                     f"near YOUR border! Allies don't stack troops on ally borders."
                 )
 
@@ -347,21 +343,20 @@ class DiplomacyAdvisor:
             aggression_ratio = troops_near / total if total > 0 else 0
             if aggression_ratio > 0.3:
                 signals.append(
-                    f"⚠️ SUSPICIOUS: {intel.name} has {aggression_ratio*100:.0f}% of "
+                    f"SUSPICIOUS: {intel.name} has {aggression_ratio*100:.0f}% of "
                     f"army facing you. Normal ally would face outward."
                 )
 
         if not signals:
-            signals.append("✅ No betrayal signals detected from allies.")
+            signals.append("No betrayal signals detected from allies.")
 
         return signals
 
-    # ── Full Diplomacy Report ────────────────────────
 
     def full_report(self) -> str:
         """Complete diplomacy analysis."""
         lines = [
-            "🤝 DIPLOMACY ADVISOR",
+            "DIPLOMACY ADVISOR",
             "=" * 60,
             "",
         ]
@@ -369,7 +364,7 @@ class DiplomacyAdvisor:
         # Threat assessment
         threats = self.assess_threats()
         if threats:
-            lines.append("⚠️ THREAT ASSESSMENT")
+            lines.append("THREAT ASSESSMENT")
             lines.append(f"{'Player':<18} {'Threat':>6} {'Power':>7} {'Action':<20}")
             lines.append(f"{'─'*18} {'─'*6} {'─'*7} {'─'*20}")
             for ta in threats:
@@ -384,7 +379,7 @@ class DiplomacyAdvisor:
         # Ally recommendations
         allies = self.recommend_allies()
         if allies:
-            lines.append("🤝 ALLY RECOMMENDATIONS (best first)")
+            lines.append("ALLY RECOMMENDATIONS (best first)")
             for i, ac in enumerate(allies[:5], 1):
                 lines.append(f"  {i}. {ac.name} — score: {ac.score:.0f}/100")
                 for r in ac.reasons[:2]:
@@ -394,12 +389,12 @@ class DiplomacyAdvisor:
         # War targets
         targets = self.recommend_war_targets()
         if targets:
-            lines.append("🎯 WAR TARGETS (easiest first)")
+            lines.append("WAR TARGETS (easiest first)")
             for i, wt in enumerate(targets[:5], 1):
-                risk_icon = {"low": "🟢", "medium": "🟡", "high": "🔴"}
+                risk_icon = {"low": "", "medium": "", "high": ""}
                 lines.append(
                     f"  {i}. {wt.name} — score: {wt.score:.0f}/100 "
-                    f"risk: {risk_icon.get(wt.risk, '⚪')} {wt.risk}"
+                    f"risk: {risk_icon.get(wt.risk, '-')} {wt.risk}"
                 )
                 for r in wt.reasons[:2]:
                     lines.append(f"     {r}")

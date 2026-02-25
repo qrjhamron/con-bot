@@ -266,7 +266,7 @@ class ResearchSpy:
         """Render research intelligence report."""
         snap = snap or ResearchSnapshot()
         lines = [
-            "🔬 RESEARCH SPY — Enemy Tech Intelligence",
+            " RESEARCH SPY — Enemy Tech Intelligence",
             f"   Game Day {snap.game_day}",
             "=" * 65,
             "",
@@ -274,24 +274,24 @@ class ResearchSpy:
 
         for pid, pr in sorted(snap.players.items()):
             all_research = set(pr.confirmed.keys()) | set(pr.implied.keys())
-            lines.append(f"👤 {pr.player_name} (Tech Tier {pr.max_tech_tier})")
+            lines.append(f"> {pr.player_name} (Tech Tier {pr.max_tech_tier})")
 
             # WMD warning
             if pr.has_nukes:
-                lines.append("   ☢️ HAS NUCLEAR PROGRAM!")
+                lines.append("    HAS NUCLEAR PROGRAM!")
             if pr.has_chemical:
-                lines.append("   ☣️ HAS CHEMICAL WEAPONS!")
+                lines.append("    HAS CHEMICAL WEAPONS!")
 
             # Confirmed research
             if pr.confirmed:
-                lines.append("   ✅ CONFIRMED research:")
+                lines.append("   CONFIRMED research:")
                 for rkey, info in pr.confirmed.items():
                     r = self.tree.get(rkey, {})
                     lines.append(f"      • {r.get('name', rkey)} — {info['source']}")
 
             # Implied research
             if pr.implied:
-                lines.append("   📎 IMPLIED research (from prerequisites):")
+                lines.append("    IMPLIED research (from prerequisites):")
                 for rkey, info in pr.implied.items():
                     r = self.tree.get(rkey, {})
                     lines.append(f"      • {r.get('name', rkey)} — {info['reason']}")
@@ -302,11 +302,11 @@ class ResearchSpy:
                     f"{UNIT_NAMES.get(uid, f'T{uid}')}×{cnt}"
                     for uid, cnt in sorted(pr.units_seen.items())
                 )
-                lines.append(f"   🎖️ Units seen: {unit_str}")
+                lines.append(f"    Units seen: {unit_str}")
 
             # Predictions
             if pr.predicted_next:
-                lines.append("   🔮 PREDICTED NEXT:")
+                lines.append("    PREDICTED NEXT:")
                 for pred in pr.predicted_next:
                     unlocks = ", ".join(pred["unlocks"]) if pred["unlocks"] else "no new units"
                     lines.append(f"      → {pred['name']} (day {pred['available_day']}) → unlocks {unlocks}")
@@ -314,13 +314,13 @@ class ResearchSpy:
             # Missing capabilities
             missing = []
             if "ad_1" not in all_research:
-                missing.append("❌ NO SAM (vulnerable to air!)")
+                missing.append("NO SAM (vulnerable to air!)")
             if "nav_1" not in all_research and snap.game_day > 5:
-                missing.append("❌ NO NAVY (coastal weakness!)")
+                missing.append("NO NAVY (coastal weakness!)")
             if "air_1" not in all_research and snap.game_day > 4:
-                missing.append("❌ NO HELICOPTERS")
+                missing.append("NO HELICOPTERS")
             if missing:
-                lines.append("   ⚠️ WEAKNESSES:")
+                lines.append("   WEAKNESSES:")
                 for m in missing:
                     lines.append(f"      {m}")
 

@@ -175,61 +175,61 @@ class PlayerProfiler:
         if p.games_played == 0:
             p.estimated_skill = "noob"
             p.threat_level = "low"
-            p.notes.append("🟢 Zero games played — absolute beginner")
+            p.notes.append(" Zero games played — absolute beginner")
         elif p.games_played < 5:
             p.estimated_skill = "noob"
             p.threat_level = "low"
-            p.notes.append(f"🟢 Only {p.games_played} games — still learning")
+            p.notes.append(f" Only {p.games_played} games — still learning")
         elif p.games_played < 20:
             if p.win_rate > 40:
                 p.estimated_skill = "casual"
                 p.threat_level = "medium"
-                p.notes.append(f"🟡 {p.win_rate:.0f}% win rate in {p.games_played} games")
+                p.notes.append(f" {p.win_rate:.0f}% win rate in {p.games_played} games")
             else:
                 p.estimated_skill = "casual"
                 p.threat_level = "low"
-                p.notes.append(f"🟢 Low win rate ({p.win_rate:.0f}%) — not a strong player")
+                p.notes.append(f" Low win rate ({p.win_rate:.0f}%) — not a strong player")
         elif p.games_played < 100:
             if p.win_rate > 50:
                 p.estimated_skill = "veteran"
                 p.threat_level = "high"
-                p.notes.append(f"🔴 Veteran — {p.win_rate:.0f}% win rate over {p.games_played} games!")
+                p.notes.append(f" Veteran — {p.win_rate:.0f}% win rate over {p.games_played} games!")
             else:
                 p.estimated_skill = "veteran"
                 p.threat_level = "medium"
-                p.notes.append(f"🟡 Experienced but inconsistent ({p.win_rate:.0f}%)")
+                p.notes.append(f" Experienced but inconsistent ({p.win_rate:.0f}%)")
         else:
             if p.win_rate > 50:
                 p.estimated_skill = "elite"
                 p.threat_level = "elite"
-                p.notes.append(f"🔴🔴 ELITE — {p.games_played} games, {p.win_rate:.0f}% wins. Very dangerous!")
+                p.notes.append(f" ELITE — {p.games_played} games, {p.win_rate:.0f}% wins. Very dangerous!")
             else:
                 p.estimated_skill = "veteran"
                 p.threat_level = "high"
-                p.notes.append(f"🔴 Very experienced ({p.games_played} games)")
+                p.notes.append(f" Very experienced ({p.games_played} games)")
 
         # Whale detection
         if p.is_paying or p.has_battle_pass:
             p.threat_level = "whale" if p.threat_level in ("high", "elite") else p.threat_level
-            p.notes.append("💰 PAYING PLAYER — may have premium units (stronger army!)")
+            p.notes.append(" PAYING PLAYER — may have premium units (stronger army!)")
         if p.has_battle_pass:
-            p.notes.append("🎖️ Has Battle Pass — dedicated player")
+            p.notes.append(" Has Battle Pass — dedicated player")
         if p.inventory_items > 5:
-            p.notes.append(f"🎁 {p.inventory_items} inventory items — uses premium features")
+            p.notes.append(f" {p.inventory_items} inventory items — uses premium features")
 
         # Rank-based adjustment
         if p.rank >= 15:
-            p.notes.append(f"⭐ High rank ({p.rank_name}) — extensive experience")
+            p.notes.append(f"* High rank ({p.rank_name}) — extensive experience")
         elif p.rank <= 3 and p.games_played > 10:
-            p.notes.append(f"🤔 Low rank ({p.rank_name}) despite {p.games_played} games — may be alt account")
+            p.notes.append(f" Low rank ({p.rank_name}) despite {p.games_played} games — may be alt account")
 
         # Abandonment detection
         if p.games_played > 5 and p.games_abandoned > p.games_played * 0.3:
-            p.notes.append(f"🏃 Abandons {p.games_abandoned}/{p.games_played} games — unreliable ally")
+            p.notes.append(f" Abandons {p.games_abandoned}/{p.games_played} games — unreliable ally")
 
         # Alliance
         if p.alliance_name:
-            p.notes.append(f"🏛️ Alliance: {p.alliance_name}")
+            p.notes.append(f" Alliance: {p.alliance_name}")
 
     def profile_from_game_player(self, player_data: dict) -> PlayerProfile:
         """Build basic profile from in-game player data (less detailed)."""
@@ -242,15 +242,15 @@ class PlayerProfiler:
     def render_profile(self, p: PlayerProfile) -> str:
         """Render player profile as text report."""
         lines = [
-            f"👤 PLAYER PROFILE: {p.username}",
+            f"> PLAYER PROFILE: {p.username}",
             "=" * 55,
             "",
             f"  🆔 User ID:    {p.user_id}",
-            f"  ⭐ Rank:       {p.rank_name} ({p.rank})",
-            f"  📊 Skill:      {p.estimated_skill.upper()}",
-            f"  ⚠️ Threat:     {p.threat_level.upper()}",
+            f"  * Rank:       {p.rank_name} ({p.rank})",
+            f"  Skill:      {p.estimated_skill.upper()}",
+            f"  Threat:     {p.threat_level.upper()}",
             "",
-            "  📈 GAME STATS",
+            "   GAME STATS",
             f"    Played:      {p.games_played}",
             f"    Won:         {p.games_won} ({p.win_rate:.1f}%)",
             f"    Lost:        {p.games_lost}",
@@ -260,7 +260,7 @@ class PlayerProfiler:
 
         if p.alliance_name:
             lines.extend([
-                "  🏛️ ALLIANCE",
+                "   ALLIANCE",
                 f"    Name:        {p.alliance_name}",
                 f"    Role:        {p.alliance_role or 'member'}",
                 "",
@@ -268,15 +268,15 @@ class PlayerProfiler:
 
         if p.is_paying or p.has_battle_pass or p.inventory_items > 0:
             lines.extend([
-                "  💰 PREMIUM STATUS",
-                f"    Paying:      {'YES 💸' if p.is_paying else 'No'}",
-                f"    Battle Pass: {'YES 🎖️' if p.has_battle_pass else 'No'}",
+                "   PREMIUM STATUS",
+                f"    Paying:      {'YES ' if p.is_paying else 'No'}",
+                f"    Battle Pass: {'YES ' if p.has_battle_pass else 'No'}",
                 f"    Inventory:   {p.inventory_items} items",
                 "",
             ])
 
         if p.notes:
-            lines.append("  📋 ANALYSIS")
+            lines.append("  ANALYSIS")
             for note in p.notes:
                 lines.append(f"    {note}")
 
@@ -288,7 +288,7 @@ class PlayerProfiler:
             return "No profiles to compare."
 
         lines = [
-            "⚔️ PLAYER COMPARISON",
+            "PLAYER COMPARISON",
             "=" * 70,
             "",
             f"{'Player':<18} {'Rank':<12} {'Games':>6} {'Win%':>6} {'Skill':<10} {'Threat':<8} {'$'}",
@@ -296,7 +296,7 @@ class PlayerProfiler:
         ]
 
         for p in sorted(profiles, key=lambda x: x.win_rate, reverse=True):
-            pay_icon = "💰" if p.is_paying else "  "
+            pay_icon = "" if p.is_paying else "  "
             lines.append(
                 f"{p.username:<18} {p.rank_name:<12} {p.games_played:>6} "
                 f"{p.win_rate:>5.1f}% {p.estimated_skill:<10} "

@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Action registry — all game actions the AI agent can execute.
-
-Each action is a function that takes specific parameters and returns
-a result dict. The ACTIONS dict maps action names to metadata used
-by Gemini function calling.
-"""
+"""Action registry for game agent tool calls."""
 
 import sys, os, time, math
 sys.path.insert(0, os.path.dirname(__file__))
@@ -14,7 +9,6 @@ from _conn import (connect, get_locations, get_armies, get_players,
                     get_properties, army_units, army_hp, army_status_str,
                     unit_name, building_name, UNIT_NAMES, BUILDING_NAMES)
 
-# ── Singleton connection ─────────────────────────────────
 _ctrl = _ge = _raw = None
 
 def _connect():
@@ -36,12 +30,7 @@ def refresh():
     return ctrl, ge, _raw
 
 
-# ═══════════════════════════════════════════════════════════
-#  READ ACTIONS (game state queries)
-# ═══════════════════════════════════════════════════════════
-
 def get_status() -> dict:
-    """Get full game dashboard: day, VP, provinces, resources, armies, production, wars."""
     ctrl, ge, raw = refresh()
     locs = get_locations(raw)
     armies_data = get_armies(raw)
@@ -353,12 +342,7 @@ def get_enemy_provinces() -> dict:
     return result
 
 
-# ═══════════════════════════════════════════════════════════
-#  WRITE ACTIONS (game state changes)
-# ═══════════════════════════════════════════════════════════
-
 def _resolve_player(name_or_id) -> int:
-    """Resolve player name (e.g. 'Ghana') or ID to player ID."""
     try:
         return int(name_or_id)
     except (ValueError, TypeError):
@@ -373,7 +357,7 @@ def _resolve_player(name_or_id) -> int:
         un = p.get('name', '').lower()
         if name_lower == nn or name_lower == dn or name_lower == un:
             return pid
-    # Then prefix/contains match (but require >50% length match to avoid 'Niger'->'Nigeria')
+    # Substring match requiring >50% length overlap
     for pid, p in players.items():
         nn = p.get('nationName', '').lower()
         dn = p.get('defaultNationName', '').lower()
@@ -479,7 +463,6 @@ def auto_conquer() -> dict:
     armies_data = get_armies(raw)
     players = get_players(raw)
 
-    # Find war enemies
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
     our_rels = nr.get('88', {})
     war_pids = set()
@@ -487,7 +470,6 @@ def auto_conquer() -> dict:
         if isinstance(rel, (int, float)) and rel == -2:
             war_pids.add(int(pk))
 
-    # Idle armies
     idle = []
     loc_list = [l for l in locs if isinstance(l, dict) and 'c' in l]
 
@@ -500,13 +482,11 @@ def auto_conquer() -> dict:
         if isinstance(a, dict) and a.get('o') == 88 and a.get('s') == 1:
             idle.append((int(aid), a))
 
-    # Enemy provinces
     targets = []
     for loc in locs:
         if isinstance(loc, dict) and loc.get('o') in war_pids:
             targets.append(loc)
 
-    # Assign
     assigned = set()
     moves = []
     for aid, a in sorted(idle, key=lambda x: -army_hp(x[1])):
@@ -554,7 +534,6 @@ def auto_produce() -> dict:
         qp = p.get('queueableProductions', [])
         items = qp[1] if isinstance(qp, list) and len(qp) > 1 else []
 
-        # Try producing in priority order
         priority = [10141, 3294, 3308, 3322, 3373]
         produced = False
         for uid in priority:
@@ -685,7 +664,7 @@ def auto_build_infrastructure() -> dict:
     """Auto-build essential buildings in cities that need them."""
     ctrl, ge, raw = refresh()
     locs = get_locations(raw)
-    essential = [2245, 2250, 2271, 2016]  # Recruiting, Local Industry, Army Base, Arms Industry
+    essential = [2245, 2250, 2271, 2016]
     results = []
     for loc in locs:
         if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
@@ -946,10 +925,7 @@ def move_all_idle_to_target(player_id: int) -> dict:
     return {'target': nation, 'deployed': len(moves), 'moves': moves}
 
 
-# ── Helper ────────────────────────────────────────────────
-
 def _extract_ar(response):
-    """Extract action result from server response."""
     res = response.get('result', response)
     ar = res.get('actionResults', {})
     for k, v in ar.items():
@@ -957,10 +933,6 @@ def _extract_ar(response):
             return v
     return 0
 
-
-# ═══════════════════════════════════════════════════════════
-#  GEMINI TOOL DECLARATIONS
-# ═══════════════════════════════════════════════════════════
 
 TOOLS = [
     {

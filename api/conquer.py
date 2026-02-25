@@ -69,7 +69,7 @@ def main():
                 'y': c.get('y', 0) if isinstance(c, dict) else 0,
             })
     
-    print(f"🎯 {len(targets)} enemy provinces | ⚔️ {len(idle)} idle armies")
+    print(f"{len(targets)} enemy provinces | {len(idle)} idle armies")
     
     if not idle:
         print("No idle armies available.")
@@ -98,7 +98,7 @@ def main():
         else:
             result = ctrl.move_army(army['id'], best['id'])
             ar = ctrl._extract_action_result(result)
-            status = '✅' if ar == 1 else '❌'
+            status = 'OK' if ar == 1 else 'FAIL'
             print(f"  {status} #{army['id']} ({army['hp']:.0f}HP) → P{best['id']} ({nation})")
             time.sleep(0.3)
 

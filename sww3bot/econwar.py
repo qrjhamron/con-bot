@@ -280,7 +280,7 @@ class EconWarfare:
         """Render economic warfare report."""
         snap = snap or EconWarSnapshot()
         lines = [
-            "💰 ECONOMIC WARFARE INTELLIGENCE",
+            " ECONOMIC WARFARE INTELLIGENCE",
             "=" * 65,
             "",
         ]
@@ -288,9 +288,9 @@ class EconWarfare:
         # Weakest player highlight
         if snap.weakest_player:
             w = snap.weakest_player
-            lines.append("🎯 WEAKEST ECONOMY")
+            lines.append("WEAKEST ECONOMY")
             lines.append(f"   {w.player_name} — Score: {w.economic_score:.0f}")
-            lines.append(f"   📉 {w.vulnerability}")
+            lines.append(f"    {w.vulnerability}")
             if w.desperate_buys:
                 for b in w.desperate_buys:
                     lines.append(f"   🆘 DESPERATE: buying {b['amount']} {b['resource']} @ ${b['price']:.1f}")
@@ -298,13 +298,13 @@ class EconWarfare:
 
         # Market overview
         if snap.market_summary:
-            lines.append("📊 MARKET OVERVIEW")
+            lines.append("MARKET OVERVIEW")
             lines.append(f"  {'Resource':<15} {'Buy Vol':>8} {'Sell Vol':>9} "
                         f"{'Avg Buy$':>8} {'Avg Sell$':>9} {'Demand':>7}")
             lines.append(f"  {'─'*15} {'─'*8} {'─'*9} {'─'*8} {'─'*9} {'─'*7}")
             for res_id, info in sorted(snap.market_summary.items()):
-                demand = "🔴 HIGH" if info["demand_ratio"] > 2 else (
-                    "🟡 MED" if info["demand_ratio"] > 1 else "🟢 LOW")
+                demand = " HIGH" if info["demand_ratio"] > 2 else (
+                    " MED" if info["demand_ratio"] > 1 else " LOW")
                 lines.append(
                     f"  {info['name']:<15} {info['buy_volume']:>8} {info['sell_volume']:>9} "
                     f"${info['avg_buy_price']:>7.1f} ${info['avg_sell_price']:>8.1f} {demand:>7}"
@@ -312,20 +312,20 @@ class EconWarfare:
             lines.append("")
 
         # Player economic profiles
-        lines.append("👥 ENEMY ECONOMIC PROFILES")
+        lines.append(" ENEMY ECONOMIC PROFILES")
         for pid, pe in sorted(snap.players.items(), key=lambda x: x[1].economic_score):
-            health = "💀" if pe.economic_score < 100 else ("🟡" if pe.economic_score < 500 else "🟢")
+            health = "" if pe.economic_score < 100 else ("" if pe.economic_score < 500 else "")
             lines.append(f"  {health} {pe.player_name} (score: {pe.economic_score:.0f})")
             if pe.shortages:
-                lines.append(f"     🔴 NEEDS: {', '.join(set(pe.shortages))}")
+                lines.append(f"      NEEDS: {', '.join(set(pe.shortages))}")
             if pe.excess:
-                lines.append(f"     🟢 EXCESS: {', '.join(set(pe.excess))}")
-            lines.append(f"     💡 {pe.vulnerability}")
+                lines.append(f"      EXCESS: {', '.join(set(pe.excess))}")
+            lines.append(f"      {pe.vulnerability}")
             lines.append("")
 
         # Top manipulation strategies
         if snap.manipulations:
-            lines.append("🗡️ RECOMMENDED STRATEGIES")
+            lines.append(" RECOMMENDED STRATEGIES")
             seen = set()
             count = 0
             for m in snap.manipulations:
@@ -334,7 +334,7 @@ class EconWarfare:
                     continue
                 seen.add(key)
                 count += 1
-                prio_icon = ["⬜", "🟡", "🟠", "🔴"][m.priority]
+                prio_icon = ["⬜", "", "~", ""][m.priority]
                 lines.append(f"  {prio_icon} [{m.action.upper()}] {m.description}")
                 lines.append(f"     Impact: {m.impact}")
             lines.append("")

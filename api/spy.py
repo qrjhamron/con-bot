@@ -37,7 +37,7 @@ def main():
             print("No spies deployed.")
             return
         
-        print(f"🕵️ Our Spies:")
+        print(f"Our Spies:")
         for sk, sv in our.items():
             if not isinstance(sv, dict):
                 continue
@@ -52,7 +52,7 @@ def main():
     elif args.cmd == 'recruit':
         result = ge.recruit_spy()
         ar = ctrl._extract_action_result(result)
-        print(f"{'✅' if ar==1 else '❌'} Recruit spy (ar={ar})")
+        print(f"{'OK' if ar==1 else 'FAIL'} Recruit spy (ar={ar})")
     
     elif args.cmd == 'deploy':
         result = ge.recruit_and_deploy_spy(args.province, MISSIONS[args.mission])
@@ -61,7 +61,7 @@ def main():
     elif args.cmd == 'recall':
         result = ge.recall_spy(args.spy_id)
         ar = ctrl._extract_action_result(result)
-        print(f"{'✅' if ar==1 else '❌'} Recall spy #{args.spy_id} (ar={ar})")
+        print(f"{'OK' if ar==1 else 'FAIL'} Recall spy #{args.spy_id} (ar={ar})")
 
 if __name__ == '__main__':
     main()

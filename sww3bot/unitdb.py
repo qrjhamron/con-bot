@@ -352,7 +352,7 @@ class UnitDatabase:
     def render_unit(self, u: UnitStats) -> str:
         """Render single unit info."""
         lines = [
-            f"🔫 {u.name} (Tier {u.tier} {u.category.upper()})",
+            f" {u.name} (Tier {u.tier} {u.category.upper()})",
             f"  HP: {u.hp}  DMG: {u.damage}  SPD: {u.speed} km/h  RNG: {u.range_km} km",
             f"  DPS: {u.dps:.2f}  Cost Eff: {u.cost_efficiency:.2f}",
             f"  Soft: {u.soft_attack}  Hard: {u.hard_attack}  Air: {u.air_attack}  DEF: {u.defense}",
@@ -365,7 +365,7 @@ class UnitDatabase:
     def render_all(self) -> str:
         """Render complete unit database."""
         lines = [
-            "🔫 UNIT DATABASE",
+            " UNIT DATABASE",
             "=" * 70,
             f"  Total units: {len(self.units)}",
             "",
@@ -374,7 +374,7 @@ class UnitDatabase:
         for cat in ["infantry", "armor", "air", "naval", "support"]:
             units = self.get_by_category(cat)
             if units:
-                lines.append(f"  📂 {cat.upper()}")
+                lines.append(f"   {cat.upper()}")
                 lines.append(f"    {'Name':<22} {'HP':>4} {'DMG':>5} {'SPD':>5} "
                            f"{'RNG':>4} {'DPS':>5} {'CostEff':>7}")
                 lines.append(f"    {'─'*22} {'─'*4} {'─'*5} {'─'*5} {'─'*4} {'─'*5} {'─'*7}")
@@ -386,12 +386,12 @@ class UnitDatabase:
                 lines.append("")
 
         # Top picks
-        lines.append("  🏆 TOP COST EFFICIENCY")
+        lines.append("  TOP COST EFFICIENCY")
         for u in self.best_cost_efficiency(5):
             lines.append(f"    {u.name}: {u.cost_efficiency:.2f}")
 
         lines.append("")
-        lines.append("  ⚡ TOP DPS")
+        lines.append("  TOP DPS")
         for u in self.best_dps(5):
             lines.append(f"    {u.name}: {u.dps:.2f}")
 
@@ -400,7 +400,7 @@ class UnitDatabase:
     def render_counter_table(self) -> str:
         """Render hard counter lookup table."""
         lines = [
-            "🎯 COUNTER TABLE",
+            "COUNTER TABLE",
             "=" * 60,
             "",
         ]
@@ -417,7 +417,7 @@ class UnitDatabase:
         """Render army recommendation."""
         comp = self.recommend_army(threat)
         lines = [
-            f"🎖️ RECOMMENDED ARMY vs {threat.upper()} THREAT",
+            f" RECOMMENDED ARMY vs {threat.upper()} THREAT",
             "=" * 50,
             "",
         ]

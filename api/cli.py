@@ -90,7 +90,7 @@ def main():
     
     cmd = sys.argv[1]
     if cmd not in COMMANDS:
-        print(f"❌ Unknown command: {cmd}")
+        print(f"Unknown command: {cmd}")
         print(f"Available: {', '.join(sorted(COMMANDS.keys()))}")
         return
     

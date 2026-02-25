@@ -36,17 +36,17 @@ def main():
             break
     
     if not template:
-        print(f"❌ T{args.unit} ({unit_name(args.unit)}) not available in P{args.province}")
+        print(f"T{args.unit} ({unit_name(args.unit)}) not available in P{args.province}")
         print(f"Available: {[item.get('unit',{}).get('t',0) for item in qp_items if isinstance(item, dict)]}")
         return
     
     result = ctrl.produce_unit(args.province, args.unit, template=template)
     ar = ctrl._extract_action_result(result)
-    print(f"{'✅' if ar==1 else '❌'} Produce {unit_name(args.unit)} in P{args.province} (ar={ar})")
+    print(f"{'OK' if ar==1 else 'FAIL'} Produce {unit_name(args.unit)} in P{args.province} (ar={ar})")
     if ar == -1:
         res = ge.get_resources()
         mp = res.get('Manpower', {}).get('amount', 0)
-        print(f"  💡 Manpower: {mp:.0f} — might be too low")
+        print(f"   Manpower: {mp:.0f} — might be too low")
 
 if __name__ == '__main__':
     main()

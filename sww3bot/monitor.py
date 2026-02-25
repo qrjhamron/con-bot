@@ -96,7 +96,7 @@ class GameMonitor:
         changes = []
 
         if old.day != new.day:
-            changes.append(f"📅 New day: {old.day} → {new.day}")
+            changes.append(f" New day: {old.day} → {new.day}")
 
         # New AI players (inactive → bot conversion)
         old_ai_ids = {p.id for p in old.ai_players()}
@@ -106,7 +106,7 @@ class GameMonitor:
             for bot_id in new_bots:
                 p = new.players.get(bot_id)
                 name = p.name if p else f"#{bot_id}"
-                changes.append(f"🤖 Player went AI: {name}")
+                changes.append(f"Player went AI: {name}")
 
         # Players eliminated
         old_active = {p.id for p in old.active_players()}
@@ -115,7 +115,7 @@ class GameMonitor:
         for pid in eliminated:
             p = old.players.get(pid)
             name = p.name if p else f"#{pid}"
-            changes.append(f"💀 Player eliminated: {name}")
+            changes.append(f" Player eliminated: {name}")
 
         return changes
 
@@ -132,7 +132,7 @@ class GameMonitor:
             changes = self.detect_changes(self.previous_state, state)
             if changes:
                 report_lines.append("")
-                report_lines.append("🔔 CHANGES DETECTED:")
+                report_lines.append(" CHANGES DETECTED:")
                 for c in changes:
                     report_lines.append(f"  {c}")
 
@@ -173,7 +173,7 @@ class GameMonitor:
                 callback(report)
             except Exception as e:
                 logger.error("Monitor cycle error: %s", e)
-                callback(f"⚠️ Error: {e}")
+                callback(f"Error: {e}")
 
             iteration += 1
             if self._running and (max_iterations is None or iteration < max_iterations):

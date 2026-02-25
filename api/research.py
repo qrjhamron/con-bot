@@ -21,7 +21,7 @@ def main():
         slots = s23.get('researchSlots', 1)
         active_count = 0
         if isinstance(current, list) and len(current) > 1:
-            print("🔬 Active Research:")
+            print(" Active Research:")
             for r in current[1]:
                 if isinstance(r, dict):
                     rid = r.get('researchTypeID', '?')
@@ -30,24 +30,24 @@ def main():
                     print(f"  R{rid}: {rem:.1f}h remaining")
                     active_count += 1
         if active_count == 0:
-            print("🔬 No active research")
-        print(f"\n📊 Slots: {active_count}/{slots}")
+            print(" No active research")
+        print(f"\nSlots: {active_count}/{slots}")
         
         # Completed
         completed = s23.get('completedResearches', {})
         done_ids = [k for k in completed.keys() if k != '@c']
         if done_ids:
-            print(f"✅ Completed: {', '.join(f'R{r}' for r in done_ids)}")
+            print(f"Completed: {', '.join(f'R{r}' for r in done_ids)}")
         return
     
     if args.cancel:
         result = ctrl.cancel_research(args.research_id)
         ar = ctrl._extract_action_result(result)
-        print(f"{'✅' if ar==1 else '❌'} Cancel research R{args.research_id} (ar={ar})")
+        print(f"{'OK' if ar==1 else 'FAIL'} Cancel research R{args.research_id} (ar={ar})")
     else:
         result = ctrl.research(args.research_id)
         ar = ctrl._extract_action_result(result)
-        print(f"{'✅' if ar==1 else '❌'} Start research R{args.research_id} (ar={ar})")
+        print(f"{'OK' if ar==1 else 'FAIL'} Start research R{args.research_id} (ar={ar})")
 
 if __name__ == '__main__':
     main()

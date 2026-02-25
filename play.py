@@ -24,7 +24,6 @@ from sww3bot.controller import GameController
 from sww3bot.autoplay import AutoPlayer
 
 
-# ── Bot credentials ──────────────────────────────────────────
 BOT_USER = os.environ.get("BOT_USER", "")
 BOT_PASS = os.environ.get("BOT_PASS", "")
 GAME_ID = int(os.environ.get("GAME_ID", "10687600"))
@@ -69,9 +68,9 @@ def main():
     parser.add_argument('--dashboard', action='store_true', help='Show dashboard')
     args = parser.parse_args()
 
-    print("🔑 Connecting to game server...")
+    print("Connecting to game server...")
     ctrl = connect()
-    print("✅ Connected!\n")
+    print("Connected!\n")
 
     if args.auto:
         player = AutoPlayer(ctrl, config={
@@ -86,7 +85,7 @@ def main():
         ar = result.get('result', result).get('actionResults', {})
         for k, v in ar.items():
             if k != '@c':
-                status = "✅ SUCCESS" if isinstance(v, (int, float)) and v > 0 else f"❌ FAIL ({v})"
+                status = "SUCCESS" if isinstance(v, (int, float)) and v > 0 else f"FAIL ({v})"
                 print(f"Move army #{army_id} → P{province}: {status}")
 
     elif args.attack:
@@ -95,7 +94,7 @@ def main():
         ar = result.get('result', result).get('actionResults', {})
         for k, v in ar.items():
             if k != '@c':
-                status = "✅ SUCCESS" if isinstance(v, (int, float)) and v > 0 else f"❌ FAIL ({v})"
+                status = "SUCCESS" if isinstance(v, (int, float)) and v > 0 else f"FAIL ({v})"
                 print(f"Attack #{army_id} → #{target}: {status}")
 
     elif args.build:
@@ -104,16 +103,16 @@ def main():
         ar = result.get('result', result).get('actionResults', {})
         for k, v in ar.items():
             if k != '@c':
-                status = "✅ SUCCESS" if isinstance(v, (int, float)) and v > 0 else f"❌ FAIL ({v})"
+                status = "SUCCESS" if isinstance(v, (int, float)) and v > 0 else f"FAIL ({v})"
                 print(f"Build U{unit} in P{province}: {status}")
 
     elif args.row:
         ctrl.offer_right_of_way(args.row)
-        print(f"🤝 Offered ROW to P{args.row}")
+        print(f"Offered ROW to P{args.row}")
 
     elif args.war:
         ctrl.declare_war(args.war)
-        print(f"🔥 Declared war on P{args.war}")
+        print(f" Declared war on P{args.war}")
 
     elif args.intel:
         intel = ctrl.get_full_intel()

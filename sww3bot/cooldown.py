@@ -197,15 +197,15 @@ class CooldownSniper:
 
     def _make_recommendation(self, atk_cd: float, aa_cd: float, strength: float) -> str:
         if atk_cd > 30 and aa_cd > 30:
-            return "🎯 PERFECT — both attack and AA disabled! Rush NOW!"
+            return "PERFECT — both attack and AA disabled! Rush NOW!"
         elif atk_cd > 30:
-            return "🎯 Ground attack safe — main weapons on cooldown"
+            return "Ground attack safe — main weapons on cooldown"
         elif aa_cd > 30:
-            return "✈️ Air strike safe — AA systems on cooldown"
+            return " Air strike safe — AA systems on cooldown"
         elif atk_cd > 10:
-            return "⚡ Quick strike — short window before they can fire"
+            return "Quick strike — short window before they can fire"
         else:
-            return "⚠️ Narrow window — proceed with caution"
+            return "Narrow window — proceed with caution"
 
     def analyze_demo(self) -> CooldownSnapshot:
         """Generate demo cooldown data."""
@@ -242,7 +242,7 @@ class CooldownSniper:
         """Render cooldown intelligence report."""
         snap = snap or CooldownSnapshot()
         lines = [
-            "🎯 ATTACK COOLDOWN SNIPER",
+            "ATTACK COOLDOWN SNIPER",
             "=" * 65,
             "",
         ]
@@ -250,25 +250,25 @@ class CooldownSniper:
         # Best target highlight
         if snap.best_target:
             t = snap.best_target
-            lines.append("🏆 #1 PRIORITY TARGET")
+            lines.append("#1 PRIORITY TARGET")
             lines.append(f"   {t.owner_name} army #{t.army_id} ({t.total_strength:.0f} strength)")
-            lines.append(f"   📍 Position: ({t.position_x:.0f}, {t.position_y:.0f})")
-            lines.append(f"   ❤️ HP: {t.hp:.0%}")
-            atk_icon = f"🔴 {t.attack_cd_remaining:.0f}s" if not t.can_attack else "🟢 READY"
-            aa_icon = f"🔴 {t.aa_cd_remaining:.0f}s" if not t.can_aa else "🟢 READY"
-            lines.append(f"   ⏱️ Attack CD: {atk_icon} | AA CD: {aa_icon}")
-            lines.append(f"   💡 Reason: {t.vulnerability_reason}")
+            lines.append(f"    Position: ({t.position_x:.0f}, {t.position_y:.0f})")
+            lines.append(f"    HP: {t.hp:.0%}")
+            atk_icon = f" {t.attack_cd_remaining:.0f}s" if not t.can_attack else " READY"
+            aa_icon = f" {t.aa_cd_remaining:.0f}s" if not t.can_aa else " READY"
+            lines.append(f"    Attack CD: {atk_icon} | AA CD: {aa_icon}")
+            lines.append(f"    Reason: {t.vulnerability_reason}")
             lines.append("")
 
         # Strike windows
         if snap.windows:
-            lines.append(f"⚡ STRIKE WINDOWS ({len(snap.windows)} targets on cooldown)")
+            lines.append(f"STRIKE WINDOWS ({len(snap.windows)} targets on cooldown)")
             lines.append(f"  {'Prio':>4} {'Army':>8} {'Owner':<16} {'Str':>4} "
                         f"{'Atk CD':>8} {'AA CD':>8} {'Window':>8}")
             lines.append(f"  {'─'*4} {'─'*8} {'─'*16} {'─'*4} "
                         f"{'─'*8} {'─'*8} {'─'*8}")
             for w in snap.windows[:10]:
-                prio_icon = ["⬜", "🟡", "🟠", "🔴"][w.priority]
+                prio_icon = ["⬜", "", "~", ""][w.priority]
                 atk = f"{w.window_duration:.0f}s" if w.attack_disabled else "—"
                 aa = f"{w.window_duration:.0f}s" if w.aa_disabled else "—"
                 lines.append(
@@ -276,18 +276,18 @@ class CooldownSniper:
                     f"{w.owner_name:<16} {w.target_strength:>4.0f} "
                     f"{atk:>8} {aa:>8} {w.window_duration:>7.0f}s"
                 )
-                lines.append(f"         💡 {w.recommendation}")
+                lines.append(f"          {w.recommendation}")
             lines.append("")
 
         # All targets sorted by vulnerability
-        lines.append("📋 ALL ENEMY ARMIES (sorted by vulnerability)")
+        lines.append("ALL ENEMY ARMIES (sorted by vulnerability)")
         lines.append(f"  {'Army':>6} {'Owner':<16} {'Str':>4} {'HP':>5} "
                     f"{'Can Atk':>7} {'Can AA':>6} {'Vuln':>5}")
         lines.append(f"  {'─'*6} {'─'*16} {'─'*4} {'─'*5} "
                     f"{'─'*7} {'─'*6} {'─'*5}")
         for t in snap.targets:
-            atk = "🟢" if t.can_attack else f"🔴{t.attack_cd_remaining:.0f}s"
-            aa = "🟢" if t.can_aa else f"🔴{t.aa_cd_remaining:.0f}s"
+            atk = "" if t.can_attack else f"{t.attack_cd_remaining:.0f}s"
+            aa = "" if t.can_aa else f"{t.aa_cd_remaining:.0f}s"
             lines.append(
                 f"  {t.army_id:>6} {t.owner_name:<16} {t.total_strength:>4.0f} "
                 f"{t.hp:>5.0%} {atk:>7} {aa:>6} {t.vulnerability:>5.1f}"

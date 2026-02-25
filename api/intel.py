@@ -32,7 +32,7 @@ def main():
     # Get our relations
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
     our_rels = nr.get('88', nr.get(88, {}))
-    rel_names = {-2:'⚔WAR', -1:'CEASE', 0:'EMBARGO', 1:'PEACE',
+    rel_names = {-2:'WARWAR', -1:'CEASE', 0:'EMBARGO', 1:'PEACE',
                  2:'NAP', 3:'ROW', 4:'MIL', 5:'PROT', 6:'INTEL', 7:'CMD'}
     
     # Group provinces by owner
@@ -67,21 +67,21 @@ def main():
         nation = p.get('nationName', f'P{owner}')
         rel = our_rels.get(str(owner), our_rels.get(owner, None))
         rel_str = rel_names.get(rel, '') if rel is not None else ''
-        marker = ' ⭐' if owner == 88 else ''
+        marker = ' *' if owner == 88 else ''
         
         # Count visible armies in this nation's territory
         visible_armies = sum(len(army_by_prov.get(l.get('id', 0), [])) for l in prov_list)
         
-        print(f"\n{'═'*60}")
+        print(f"\n{'='*60}")
         print(f"  {nation} (P{owner}) | {len(prov_list)} provinces | {visible_armies} visible armies {rel_str}{marker}")
-        print(f"{'═'*60}")
+        print(f"{'='*60}")
         
         # Show cities first, then provinces with armies
         cities = [l for l in prov_list if l.get('plv', 0) >= 4]
         army_provs = [l for l in prov_list if l.get('id', 0) in army_by_prov and l.get('plv', 0) < 4]
         
         if cities:
-            print(f"\n  🏙️ Cities ({len(cities)}):")
+            print(f"\n  Cities ({len(cities)}):")
             for city in sorted(cities, key=lambda x: -x.get('plv', 0)):
                 pid = city.get('id', 0)
                 plv = city.get('plv', 0)
@@ -95,7 +95,7 @@ def main():
                     if isinstance(u, dict):
                         uid = u.get('id', 0)
                         built = u.get('built', True)
-                        s = '🔨' if built is False else ''
+                        s = '[BUILD]' if built is False else ''
                         bldgs.append(f"{building_name(uid)}{s}")
                 
                 # Production
@@ -106,7 +106,7 @@ def main():
                     ut = su.get('unit', {}).get('t', su.get('t', 0))
                     comp = pi.get('t', 0)
                     rem = (comp - now_ms) / 3600000
-                    prod_str = f' | 🏭 {unit_name(ut)} ({rem:.1f}h)'
+                    prod_str = f' | [PROD] {unit_name(ut)} ({rem:.1f}h)'
                 
                 print(f"    P{pid} Lv{plv} M{morale}%{prod_str}")
                 if bldgs:
@@ -119,10 +119,10 @@ def main():
                         hp = army_hp(a)
                         status = army_status_str(a.get('s', 0))
                         unit_strs = [f"{unit_name(u.get('t',0))}({u.get('hp',0):.0f}HP)" for u in units if isinstance(u, dict)]
-                        print(f"      ⚔️ #{aid} {status} {hp:.0f}HP: {', '.join(unit_strs)}")
+                        print(f"      #{aid} {status} {hp:.0f}HP: {', '.join(unit_strs)}")
         
         if army_provs:
-            print(f"\n  ⚔️ Provinces with armies:")
+            print(f"\n  Provinces with armies:")
             for loc in army_provs:
                 pid = loc.get('id', 0)
                 morale = loc.get('m', 0)
@@ -135,8 +135,8 @@ def main():
     
     # Summary
     total_armies = sum(1 for aid, a in armies.items() if isinstance(a, dict) and aid != '@c' and a.get('o') == 88)
-    print(f"\n📊 Summary: {len(by_owner)} nations shown, {total_armies} of our armies total")
-    print(f"💡 Note: Only OUR armies are visible. Enemy armies require SHARED_INTEL or adjacent spies.")
+    print(f"\nSummary: {len(by_owner)} nations shown, {total_armies} of our armies total")
+    print(f" Note: Only OUR armies are visible. Enemy armies require SHARED_INTEL or adjacent spies.")
 
 if __name__ == '__main__':
     main()

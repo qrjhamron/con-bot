@@ -414,7 +414,7 @@ class RealTimeTracker:
         """Render real-time tracking dashboard."""
         snap = snap or self._snapshot
         lines = [
-            "📡 REAL-TIME ARMY TRACKER",
+            "REAL-TIME ARMY TRACKER",
             f"   Poll #{snap.poll_count} | "
             f"Tracking {len(snap.tracked_armies)} armies | "
             f"{len(snap.alerts)} alerts",
@@ -424,11 +424,11 @@ class RealTimeTracker:
 
         # Critical alerts first
         if snap.alerts:
-            lines.append("🚨 MOVEMENT ALERTS")
+            lines.append("MOVEMENT ALERTS")
             for a in sorted(snap.alerts, key=lambda x: -x.priority):
-                icon = {"attack_detected": "⚔️", "new_movement": "→",
-                        "direction_change": "↪️", "arrived": "📍"}.get(a.alert_type, "•")
-                prio = ["ℹ️", "⚠️", "🔴"][a.priority]
+                icon = {"attack_detected": "", "new_movement": "→",
+                        "direction_change": "", "arrived": ""}.get(a.alert_type, "•")
+                prio = ["", "WARN", ""][a.priority]
                 eta_str = f" ETA {a.eta_seconds:.0f}s" if a.eta_seconds > 0 else ""
                 lines.append(
                     f"  {prio} {icon} {a.owner_name} #{a.army_id}: "
@@ -443,20 +443,20 @@ class RealTimeTracker:
 
         # Ambush windows
         if snap.ambush_windows:
-            lines.append("🎯 AMBUSH WINDOWS")
+            lines.append("AMBUSH WINDOWS")
             for w in sorted(snap.ambush_windows, key=lambda x: x.strength, reverse=True)[:5]:
                 lines.append(
-                    f"  🗡️ {w.owner_name} #{w.target_army_id} ({w.strength:.0f} str)"
+                    f"   {w.owner_name} #{w.target_army_id} ({w.strength:.0f} str)"
                 )
-                lines.append(f"     📍 Intercept: ({w.intercept_x:.0f},{w.intercept_y:.0f})")
-                lines.append(f"     ⏱️ Window: {w.window_seconds:.0f}s — {w.reason}")
+                lines.append(f"      Intercept: ({w.intercept_x:.0f},{w.intercept_y:.0f})")
+                lines.append(f"      Window: {w.window_seconds:.0f}s — {w.reason}")
             lines.append("")
 
         # All tracked enemy armies
         enemies = {aid: a for aid, a in snap.tracked_armies.items()
                    if a.owner_id not in self.my_ids}
         if enemies:
-            lines.append("👁️ ALL ENEMY ARMIES")
+            lines.append(" ALL ENEMY ARMIES")
             lines.append(f"  {'ID':>6} {'Owner':<16} {'Str':>4} {'HP':>5} {'Cmd':<10} "
                         f"{'Position':<16} {'Target':<16} {'Units'}")
             lines.append(f"  {'─'*6} {'─'*16} {'─'*4} {'─'*5} {'─'*10} "
@@ -465,8 +465,8 @@ class RealTimeTracker:
                 pos = f"({a.current_x:.0f},{a.current_y:.0f})"
                 tgt = f"({a.target_x:.0f},{a.target_y:.0f})" if a.is_moving else "—"
                 units = self._units_str(a.units) if a.units else "?"
-                cmd_icon = {"attack": "⚔️", "move": "→", "patrol": "🔄",
-                           "wait": "⏳", "stationary": "🏕️"}.get(a.command, "?")
+                cmd_icon = {"attack": "", "move": "→", "patrol": "",
+                           "wait": "", "stationary": ""}.get(a.command, "?")
                 lines.append(
                     f"  {aid:>6} {a.owner_name:<16} {a.total_strength:>4.0f} "
                     f"{a.hp:>5.0%} {cmd_icon} {a.command:<7} "

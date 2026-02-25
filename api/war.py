@@ -15,14 +15,14 @@ def main():
     nation = players.get(args.player, {}).get('nationName', f'P{args.player}')
     
     if not args.confirm:
-        resp = input(f"⚠️ Declare WAR on {nation} (P{args.player})? [y/N]: ")
+        resp = input(f"Declare WAR on {nation} (P{args.player})? [y/N]: ")
         if resp.lower() != 'y':
             print("Cancelled.")
             return
     
     result = ctrl.declare_war(args.player)
     ar = ctrl._extract_action_result(result)
-    print(f"{'✅' if ar in [0,1] else '❌'} WAR declared on {nation} (ar={ar})")
+    print(f"{'OK' if ar in [0,1] else 'FAIL'} WAR declared on {nation} (ar={ar})")
 
 if __name__ == '__main__':
     main()

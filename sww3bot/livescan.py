@@ -272,9 +272,9 @@ class LiveScanner:
             # Generate alerts for important changes
             for c in changes:
                 if c.get('from_id') == target_pid or c.get('to_id') == target_pid:
-                    report['alerts'].append(f"🚨 {c['type']}: Province #{c['prov']} — {json.dumps(c)}")
+                    report['alerts'].append(f"{c['type']}: Province #{c['prov']} — {json.dumps(c)}")
                 elif c.get('owner_id') in enemies:
-                    report['alerts'].append(f"⚠️ {c['type']}: {c.get('owner','')} at #{c['prov']}")
+                    report['alerts'].append(f"{c['type']}: {c.get('owner','')} at #{c['prov']}")
         
         # Border threat analysis
         for eid in enemies:
@@ -288,7 +288,7 @@ class LiveScanner:
                 if prev_provs_count != curr_provs_count and pid_int in [target_pid] + enemies:
                     name = pdata.get('nation', f'P{pid_int}')
                     delta = curr_provs_count - prev_provs_count
-                    report['alerts'].append(f"📊 {name}: {prev_provs_count} → {curr_provs_count} provinces ({delta:+d})")
+                    report['alerts'].append(f"{name}: {prev_provs_count} → {curr_provs_count} provinces ({delta:+d})")
         
         self.prev_state = provs
         return report
@@ -297,39 +297,39 @@ class LiveScanner:
         """Format scan report for display."""
         lines = []
         lines.append(f"\n{'='*60}")
-        lines.append(f"🔍 SCAN #{report['scan']} @ {report['time']} | Day {report['day']}")
+        lines.append(f" SCAN #{report['scan']} @ {report['time']} | Day {report['day']}")
         lines.append(f"{'='*60}")
         
         # Strengths
         ts = report['target_strength']
-        lines.append(f"\n🏠 {report['target'].get('nation','You')}: {ts['provinces']} provs, VP={ts['total_vp']}, RP={ts['total_rp']}, {ts['total_buildings']} bldgs")
+        lines.append(f"\n {report['target'].get('nation','You')}: {ts['provinces']} provs, VP={ts['total_vp']}, RP={ts['total_rp']}, {ts['total_buildings']} bldgs")
         
         for eid, es in report['enemy_strengths'].items():
             ename = report['enemies'].get(eid, {}).get('nation', f'P{eid}')
-            lines.append(f"🔴 {ename}: {es['provinces']} provs, VP={es['total_vp']}, RP={es['total_rp']}, {es['total_buildings']} bldgs")
+            lines.append(f" {ename}: {es['provinces']} provs, VP={es['total_vp']}, RP={es['total_rp']}, {es['total_buildings']} bldgs")
         
         # Threats
         for eid, threat in report['threats'].items():
             ename = report['enemies'].get(eid, {}).get('nation', f'P{eid}')
             if threat['vectors']:
-                lines.append(f"\n⚔️ {ename} THREAT SCORE: {threat['score']:.0f}")
+                lines.append(f"\n{ename} THREAT SCORE: {threat['score']:.0f}")
                 for v in threat['vectors'][:5]:
                     lines.append(f"   #{v['from']} ({v['from_bldg']}b, VP{v['from_vp']}) → #{v['to']} [{v['dist']:.0f}]")
         
         # Changes
         if report['changes']:
-            lines.append(f"\n🔄 CHANGES DETECTED ({len(report['changes'])}):")
+            lines.append(f"\nCHANGES DETECTED ({len(report['changes'])}):")
             for c in report['changes']:
                 lines.append(f"   {c['type']}: #{c.get('prov','')} — {json.dumps({k:v for k,v in c.items() if k != 'type'})}")
         
         # Alerts
         if report['alerts']:
-            lines.append(f"\n{'🚨'*10}")
+            lines.append(f"\n{''*10}")
             for a in report['alerts']:
                 lines.append(f"   {a}")
-            lines.append(f"{'🚨'*10}")
+            lines.append(f"{''*10}")
         else:
-            lines.append(f"\n✅ No changes detected")
+            lines.append(f"\nNo changes detected")
         
         return '\n'.join(lines)
 
@@ -344,15 +344,15 @@ def main():
         int(os.environ.get("GAME_ID", "10687207"))
     )
     
-    print("🔑 Logging in...")
+    print("Logging in...")
     scanner.login()
-    print(f"✅ Connected to {scanner.auth['server']}")
+    print(f"Connected to {scanner.auth['server']}")
     print(f"   Chat server: {scanner.auth['chat_server']}")
     
     # Single scan mode or continuous
     if '--loop' in sys.argv:
         interval = 120  # 2 minutes
-        print(f"\n🔄 Starting continuous scan (every {interval}s)...")
+        print(f"\nStarting continuous scan (every {interval}s)...")
         print("   Press Ctrl+C to stop\n")
         
         while True:
@@ -366,10 +366,10 @@ def main():
                 
                 time.sleep(interval)
             except KeyboardInterrupt:
-                print("\n\n⏹️ Scanner stopped.")
+                print("\n\n Scanner stopped.")
                 break
             except Exception as e:
-                print(f"\n❌ Error: {e}")
+                print(f"\nError: {e}")
                 print("   Retrying in 30s...")
                 time.sleep(30)
                 try:
@@ -388,7 +388,7 @@ def main():
                 'time': time.time(),
                 'scan': scanner.scan_count
             }, f)
-        print(f"\n💾 State saved for delta tracking")
+        print(f"\nState saved for delta tracking")
 
 
 if __name__ == '__main__':

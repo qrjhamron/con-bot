@@ -56,7 +56,6 @@ class Action:
         return " | ".join(parts)
 
 
-# ── Build order template ────────────────────────────────────────
 # Standard template adapted from community guides.
 # Day numbers are in-game days; real-time depends on speed multiplier.
 
@@ -146,7 +145,6 @@ BUILD_ORDER_TEMPLATE = {
                unit=UnitType.TOWED_ARTILLERY,
                reason="Artillery + fighters now core army"),
     ],
-    # ── MID GAME (Day 15-30) ──
     16: [
         Action(ActionType.BUILD, Priority.HIGH,
                building=BuildingType.ARMY_BASE, level=1,
@@ -202,7 +200,6 @@ BUILD_ORDER_TEMPLATE = {
                unit=UnitType.TANK_DESTROYER,
                reason="Counter enemy tank spam"),
     ],
-    # ── LATE GAME (Day 30+) ──
     30: [
         Action(ActionType.BUILD, Priority.HIGH,
                building=BuildingType.AIR_BASE, level=2,
@@ -392,7 +389,7 @@ class StrategyEngine:
         """Pretty-print army composition recommendation."""
         comp = self.recommend_army_composition()
         lines = [
-            f"⚔️  RECOMMENDED ARMY — {comp['name']}",
+            f" RECOMMENDED ARMY — {comp['name']}",
             f"   Day {self.state.day} ({self.state.phase})",
             "",
         ]
@@ -401,7 +398,7 @@ class StrategyEngine:
             bar = "█" * count + "░" * (5 - count)
             pct = count / total * 100
             lines.append(f"   {unit:<25} x{count} [{bar}] {pct:.0f}%")
-        lines.append(f"\n   📝 {comp['notes']}")
+        lines.append(f"\n    {comp['notes']}")
         return "\n".join(lines)
 
     def summary(self) -> str:
@@ -409,23 +406,23 @@ class StrategyEngine:
         plan = self.generate_full_plan()
         gs = self.state
         lines = [
-            f"═══ SUPREMACY WW3 BOT — Day {gs.day} ({gs.phase.upper()}) ═══",
+            f"=== SUPREMACY WW3 BOT — Day {gs.day} ({gs.phase.upper()}) ===",
             f"Speed: {gs.speed}x | Real-time per day: {gs.real_hours_per_day:.1f}h",
             f"Active players: {len(gs.active_players())} | AI: {len(gs.ai_players())}",
             "",
         ]
 
         if not plan:
-            lines.append("✅ No actions needed right now. Monitor and wait.")
+            lines.append("No actions needed right now. Monitor and wait.")
         else:
-            lines.append(f"📋 {len(plan)} actions queued:")
+            lines.append(f"{len(plan)} actions queued:")
             lines.append("")
             for i, action in enumerate(plan, 1):
                 icon = {
-                    Priority.CRITICAL: "🔴",
-                    Priority.HIGH: "🟠",
-                    Priority.MEDIUM: "🟡",
-                    Priority.LOW: "🟢",
+                    Priority.CRITICAL: "",
+                    Priority.HIGH: "~",
+                    Priority.MEDIUM: "",
+                    Priority.LOW: "",
                 }[action.priority]
                 lines.append(f"  {icon} {i}. {action}")
 

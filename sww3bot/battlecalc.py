@@ -226,60 +226,60 @@ class BattleCalculator:
                               atk_hp, dfn_hp, atk_units, dfn_units) -> str:
         if winner == "attacker":
             if confidence == "certain":
-                return "✅ ATTACK! Easy win, you heavily outmatch them."
+                return "ATTACK! Easy win, you heavily outmatch them."
             elif confidence == "likely":
-                return "✅ Attack recommended. You have the advantage."
+                return "Attack recommended. You have the advantage."
             else:
-                return "⚠️ Close fight — you'd likely win but with heavy losses."
+                return "Close fight — you'd likely win but with heavy losses."
         elif winner == "defender":
             if confidence == "certain":
-                return "❌ DO NOT ATTACK. You will be crushed."
+                return "DO NOT ATTACK. You will be crushed."
             elif confidence == "likely":
-                return "❌ Avoid this fight. Defender has the edge."
+                return "Avoid this fight. Defender has the edge."
             else:
-                return "⚠️ Risky — defender has slight advantage. Consider reinforcing."
+                return "Risky — defender has slight advantage. Consider reinforcing."
         else:
-            return "⚖️ Dead even. Both sides will take massive losses."
+            return " Dead even. Both sides will take massive losses."
 
     def quick_check(self, my_units: list, enemy_units: list) -> str:
         """Quick win/lose check returning emoji verdict."""
         result = self.calc(my_units, enemy_units)
-        icon = {"attacker": "✅", "defender": "❌", "draw": "⚖️"}[result.winner]
+        icon = {"attacker": "OK", "defender": "FAIL", "draw": ""}[result.winner]
         return f"{icon} {result.confidence.upper()} {result.winner} win | " \
                f"You survive {result.attacker_survival_pct:.0%} vs {result.defender_survival_pct:.0%}"
 
     def render(self, result: BattleResult) -> str:
         """Render detailed battle report."""
         lines = [
-            "⚔️ BATTLE OUTCOME PREDICTION",
+            "BATTLE OUTCOME PREDICTION",
             "=" * 55,
             "",
-            f"  🔵 ATTACKER: {result.attacker_name}",
+            f"   ATTACKER: {result.attacker_name}",
         ]
         for u in result.attacker_units:
             lines.append(f"     {u['name']} ×{u['count']}")
         lines.append(f"     Total HP: {result.attacker_total_hp:.0f} | DPS: {result.attacker_dps:.1f}")
         lines.append("")
-        lines.append(f"  🔴 DEFENDER: {result.defender_name}")
+        lines.append(f"   DEFENDER: {result.defender_name}")
         for u in result.defender_units:
             lines.append(f"     {u['name']} ×{u['count']}")
         lines.append(f"     Total HP: {result.defender_total_hp:.0f} | DPS: {result.defender_dps:.1f}")
         lines.append("")
         lines.append(f"  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        winner_icon = {"attacker": "🔵", "defender": "🔴", "draw": "⚖️"}[result.winner]
+        winner_icon = {"attacker": "", "defender": "", "draw": ""}[result.winner]
         lines.append(f"  {winner_icon} WINNER: {result.winner.upper()} ({result.confidence})")
         lines.append(f"  Rounds: {result.rounds_to_resolve}")
         lines.append(f"  Attacker survives: {result.attacker_survival_pct:.0%}")
         lines.append(f"  Defender survives: {result.defender_survival_pct:.0%}")
         lines.append("")
-        lines.append(f"  💡 {result.recommendation}")
+        lines.append(f"   {result.recommendation}")
         return "\n".join(lines)
 
     def render_matchup_table(self, my_units: list, enemies: dict) -> str:
         """Render matchup table against multiple enemy armies."""
         lines = [
-            "📊 MATCHUP TABLE — Your army vs all enemies",
+            "MATCHUP TABLE — Your army vs all enemies",
             "=" * 60,
             "",
         ]
@@ -294,7 +294,7 @@ class BattleCalculator:
 
         for name, enemy_units in enemies.items():
             r = self.calc(my_units, enemy_units, attacker_name="You", defender_name=name)
-            icon = {"attacker": "✅ WIN", "defender": "❌ LOSE", "draw": "⚖️ DRAW"}[r.winner]
+            icon = {"attacker": "WIN", "defender": "LOSE", "draw": " DRAW"}[r.winner]
             lines.append(f"  {name:<20} {icon:>10} {r.confidence:>12} {r.attacker_survival_pct:>11.0%}")
 
         return "\n".join(lines)

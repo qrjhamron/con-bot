@@ -15,7 +15,7 @@ def main():
     
     result = ctrl.offer_peace(args.player)
     ar = ctrl._extract_action_result(result)
-    print(f"{'✅' if ar in [0,1] else '❌'} Peace offered to {nation} (ar={ar})")
+    print(f"{'OK' if ar in [0,1] else 'FAIL'} Peace offered to {nation} (ar={ar})")
 
 if __name__ == '__main__':
     main()

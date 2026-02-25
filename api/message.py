@@ -14,7 +14,7 @@ def main():
     ctrl, ge, raw = connect()
     result = ge.send_message(args.player, args.message, args.subject)
     ar = ctrl._extract_action_result(result)
-    print(f"{'✅' if ar in [0,1] else '❌'} Message sent to P{args.player} (ar={ar})")
+    print(f"{'OK' if ar in [0,1] else 'FAIL'} Message sent to P{args.player} (ar={ar})")
 
 if __name__ == '__main__':
     main()

@@ -33,8 +33,8 @@ class QueueItem:
     can_afford: bool = True
 
     def __repr__(self):
-        pri_icons = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "⚪"}
-        icon = pri_icons.get(self.priority, "⚪")
+        pri_icons = {1: "", 2: "~", 3: "", 4: "", 5: "-"}
+        icon = pri_icons.get(self.priority, "-")
         loc = f" @ {self.province_name}" if self.province_name else ""
         return f"{icon} [{self.action}] {self.target}{loc} — {self.reason}"
 
@@ -221,7 +221,7 @@ class AutoQueue:
 
         items = self.queue[:limit]
         lines = [
-            f"🤖 AUTO-QUEUE — Mode: {self.mode.name} | Day {self.state.day}",
+            f"AUTO-QUEUE — Mode: {self.mode.name} | Day {self.state.day}",
             "=" * 60,
             "",
         ]
@@ -233,25 +233,25 @@ class AutoQueue:
         other = [q for q in items if q.action not in ("emergency", "build", "upgrade", "produce")]
 
         if emergency:
-            lines.append("🚨 EMERGENCY")
+            lines.append("EMERGENCY")
             for q in emergency:
                 lines.append(f"  {q}")
             lines.append("")
 
         if builds:
-            lines.append("🏗️  BUILD / UPGRADE")
+            lines.append("[CONST]  BUILD / UPGRADE")
             for q in builds:
                 lines.append(f"  {q}")
             lines.append("")
 
         if units:
-            lines.append("⚔️  UNIT PRODUCTION")
+            lines.append(" UNIT PRODUCTION")
             for q in units:
                 lines.append(f"  {q}")
             lines.append("")
 
         if other:
-            lines.append("📋 OTHER")
+            lines.append("OTHER")
             for q in other:
                 lines.append(f"  {q}")
             lines.append("")

@@ -138,50 +138,50 @@ class CityInspector:
         buildings = self.get_buildings(province)
 
         lines = [
-            f"🏙️  {province.name} (ID: {province.id})",
+            f" {province.name} (ID: {province.id})",
             f"   Owner: Player {province.owner_id}",
         ]
 
         # Tags
         tags = []
         if province.is_capital:
-            tags.append("👑 Capital")
+            tags.append(" Capital")
         if province.is_double_resource:
-            tags.append("💎 Double Resource")
+            tags.append(" Double Resource")
         if province.is_coastal:
-            tags.append("🌊 Coastal")
+            tags.append(" Coastal")
         if tags:
             lines.append(f"   {' | '.join(tags)}")
 
         # Morale
-        morale_icon = "🟢" if province.morale >= 70 else ("🟡" if province.morale >= 34 else "🔴")
+        morale_icon = "" if province.morale >= 70 else ("" if province.morale >= 34 else "")
         lines.append(f"   Morale: {morale_icon} {province.morale:.1f}%")
         if province.needs_morale_fix:
-            lines.append(f"   ⚠️  INSURGENCY RISK! Below 34%")
+            lines.append(f"    INSURGENCY RISK! Below 34%")
 
         # Garrison
         if province.garrison_strength > 0:
             lines.append(f"   Garrison: {province.garrison_strength:.0f} strength")
         else:
-            lines.append(f"   Garrison: ❌ UNDEFENDED")
+            lines.append(f"   Garrison: UNDEFENDED")
 
         # Buildings
         lines.append(f"   ── Buildings ──")
         for b in buildings:
             if b.is_maxed:
                 bar = "█" * b.max_level
-                lines.append(f"   {b.building.value:<20} Lv{b.level}/{b.max_level} [{bar}] ✅ MAX")
+                lines.append(f"   {b.building.value:<20} Lv{b.level}/{b.max_level} [{bar}] MAX")
             elif b.level > 0:
                 filled = "█" * b.level
                 empty = "░" * (b.max_level - b.level)
-                pri_icon = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "⚪"}.get(b.upgrade_priority, "⚪")
+                pri_icon = {1: "", 2: "~", 3: "", 4: "", 5: "-"}.get(b.upgrade_priority, "-")
                 lines.append(
                     f"   {b.building.value:<20} Lv{b.level}/{b.max_level} [{filled}{empty}] "
                     f"{pri_icon} upgrade → Lv{b.level + 1}"
                 )
             else:
                 empty = "░" * b.max_level
-                pri_icon = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "⚪"}.get(b.upgrade_priority, "⚪")
+                pri_icon = {1: "", 2: "~", 3: "", 4: "", 5: "-"}.get(b.upgrade_priority, "-")
                 lines.append(
                     f"   {b.building.value:<20} Lv0/{b.max_level} [{empty}] "
                     f"{pri_icon} BUILD"
@@ -193,7 +193,7 @@ class CityInspector:
         """Quick summary of all cities."""
         cities = self.my_cities()
         lines = [
-            f"🏘️  MY CITIES ({len(cities)} provinces)",
+            f"  MY CITIES ({len(cities)} provinces)",
             "=" * 55,
             "",
             f"{'#':<3} {'Name':<20} {'Morale':>7} {'Type':<15} {'Buildings'}",
@@ -203,14 +203,14 @@ class CityInspector:
         for i, city in enumerate(cities, 1):
             tags = []
             if city.is_capital:
-                tags.append("👑")
+                tags.append("")
             if city.is_double_resource:
-                tags.append("💎")
+                tags.append("")
             if city.is_coastal:
-                tags.append("🌊")
+                tags.append("")
             tag_str = " ".join(tags) if tags else "─"
 
-            morale_icon = "🟢" if city.morale >= 70 else ("🟡" if city.morale >= 34 else "🔴")
+            morale_icon = "" if city.morale >= 70 else ("" if city.morale >= 34 else "")
             built = sum(1 for v in city.buildings.values() if isinstance(v, int) and v > 0)
 
             lines.append(
@@ -235,21 +235,21 @@ class CityInspector:
         recs = self.upgrade_recommendations()[:limit]
 
         lines = [
-            f"🔧 BUILD QUEUE — Top {min(limit, len(recs))} upgrades",
+            f" BUILD QUEUE — Top {min(limit, len(recs))} upgrades",
             "=" * 55,
             "",
         ]
 
-        pri_icons = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "⚪"}
+        pri_icons = {1: "", 2: "~", 3: "", 4: "", 5: "-"}
 
         for i, (city, building) in enumerate(recs, 1):
-            icon = pri_icons.get(building.upgrade_priority, "⚪")
+            icon = pri_icons.get(building.upgrade_priority, "-")
             action = "BUILD" if building.level == 0 else f"Lv{building.level}→{building.level + 1}"
             lines.append(
                 f"  {icon} {i:>2}. {city.name:<18} {building.building.value:<18} {action}"
             )
 
         if not recs:
-            lines.append("  ✅ All buildings up to date!")
+            lines.append("  All buildings up to date!")
 
         return "\n".join(lines)

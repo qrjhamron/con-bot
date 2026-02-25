@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 import google.generativeai as genai
 from actions import TOOLS, refresh, _connect
 
-# ── Config ────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDNPeqNhDlv7tP3u-NHuHQ2cRizv68IATw')
 MODEL_NAME = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
 FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash']
@@ -141,9 +140,9 @@ class SWW3Agent:
         self.verbose = True
         self._init_model()
         # Initialize game connection
-        print("🔌 Connecting to game server...")
+        print("Connecting to game server...")
         _connect()
-        print("✅ Connected! Agent ready.\n")
+        print("Connected! Agent ready.\n")
 
     def _init_model(self, model_name=None, api_key=None):
         """Initialize or switch Gemini model with fallback."""
@@ -176,7 +175,7 @@ class SWW3Agent:
                             if model == self.current_model and key == self.current_key:
                                 continue
                             try:
-                                print(f"  🔄 Switching to {model}...")
+                                print(f"  Switching to {model}...")
                                 self._init_model(model, key)
                                 response = self.chat.send_message(user_message)
                                 switched = True
@@ -188,13 +187,13 @@ class SWW3Agent:
                     if switched:
                         break
                     wait = min((attempt + 1) * 15, 60)
-                    print(f"  ⏳ Rate limited, waiting {wait}s...")
+                    print(f"  Rate limited, waiting {wait}s...")
                     time.sleep(wait)
                     continue
-                return f"❌ Gemini error: {e}"
+                return f"Gemini error: {e}"
 
         if response is None:
-            return "❌ All models rate limited. Try again later."
+            return "All models rate limited. Try again later."
 
         # Process function calls in a loop until Gemini gives a text response
         max_rounds = 10
@@ -221,14 +220,14 @@ class SWW3Agent:
 
                 if self.verbose:
                     args_str = ', '.join(f'{k}={v}' for k, v in args.items())
-                    print(f"  ⚡ {name}({args_str})")
+                    print(f"  {name}({args_str})")
 
                 result_str = _execute_function(name, args)
 
                 if self.verbose:
                     # Show abbreviated result
                     preview = result_str[:200] + '...' if len(result_str) > 200 else result_str
-                    print(f"  📋 → {preview}")
+                    print(f"  → {preview}")
 
                 func_responses.append(
                     genai.protos.Part(function_response=genai.protos.FunctionResponse(
@@ -247,34 +246,34 @@ class SWW3Agent:
                 except Exception as e:
                     if '429' in str(e) and retry < 2:
                         wait = (retry + 1) * 15
-                        print(f"  ⏳ Rate limited, waiting {wait}s...")
+                        print(f"  Rate limited, waiting {wait}s...")
                         time.sleep(wait)
                         continue
-                    return f"❌ Gemini error on function response: {e}"
+                    return f"Gemini error on function response: {e}"
 
-        return "⚠️ Max rounds reached — agent stopped to prevent infinite loop."
+        return "Max rounds reached — agent stopped to prevent infinite loop."
 
     def auto_play(self, interval_minutes: int = 30):
         """Auto-play mode: run conquest cycle every N minutes."""
-        print(f"🤖 Auto-play mode: conquest cycle every {interval_minutes} min")
+        print(f"Auto-play mode: conquest cycle every {interval_minutes} min")
         print("   Press Ctrl+C to stop\n")
 
         while True:
             print(f"\n{'='*50}")
-            print(f"⏰ {time.strftime('%H:%M:%S')} — Running conquest cycle...")
+            print(f"{time.strftime('%H:%M:%S')} — Running conquest cycle...")
             print(f"{'='*50}")
 
             try:
                 result = self.execute("Jalankan full conquest cycle: declare war semua bot lemah, kirim semua army idle ke musuh, produce unit di semua kota idle. Laporkan hasilnya.")
                 print(f"\n{result}")
             except Exception as e:
-                print(f"❌ Error: {e}")
+                print(f"Error: {e}")
 
-            print(f"\n💤 Sleeping {interval_minutes} minutes...")
+            print(f"\nSleeping {interval_minutes} minutes...")
             try:
                 time.sleep(interval_minutes * 60)
             except KeyboardInterrupt:
-                print("\n🛑 Auto-play stopped.")
+                print("\nAuto-play stopped.")
                 break
 
 
@@ -298,35 +297,31 @@ def main():
     if args.command:
         # Single command mode
         cmd = ' '.join(args.command)
-        print(f"🎯 Command: {cmd}\n")
+        print(f"Command: {cmd}\n")
         result = agent.execute(cmd)
         print(f"\n{result}")
         return
 
     # Interactive mode
-    print("╔══════════════════════════════════════════╗")
-    print("║  🤖 SWW3 AI AGENT — Interactive Mode     ║")
-    print("║  Ketik perintah dalam Bahasa Indonesia    ║")
-    print("║  Contoh: 'bangun army base di semua kota' ║")
-    print("║  Ketik 'quit' untuk keluar                ║")
-    print("╚══════════════════════════════════════════╝\n")
+    print("SWW3 AI AGENT")
+    print("Type commands or 'quit' to exit.\n")
 
     while True:
         try:
-            user_input = input("🎮 You > ").strip()
+            user_input = input("You > ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\n👋 Bye!")
+            print("\nBye!")
             break
 
         if not user_input:
             continue
         if user_input.lower() in ('quit', 'exit', 'q'):
-            print("👋 Bye!")
+            print("Bye!")
             break
 
         print()
         result = agent.execute(user_input)
-        print(f"\n🤖 Agent > {result}\n")
+        print(f"\nAgent > {result}\n")
 
 
 if __name__ == '__main__':

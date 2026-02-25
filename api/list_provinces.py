@@ -45,14 +45,14 @@ def main():
             if isinstance(u, dict):
                 uid = u.get('id', 0)
                 built = u.get('built', True)
-                status = '' if built is not False else '🔨'
+                status = '' if built is not False else '[BUILD]'
                 buildings.append(f"{building_name(uid)}{status}")
         
         bldg_str = ', '.join(buildings[:4])
         if len(buildings) > 4:
             bldg_str += f' +{len(buildings)-4}'
         
-        city = '🏙️' if plv >= 4 else '  '
+        city = '' if plv >= 4 else '  '
         print(f"P{pid:>5} {plv:>3} {morale:>6}% {city} {bldg_str}")
 
 if __name__ == '__main__':

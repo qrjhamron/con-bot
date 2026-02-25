@@ -141,7 +141,7 @@ def _make_demo_state(day=1, speed=4, country="Indonesia"):
 
 def demo_mode():
     """Run a demo with simulated game state to show bot capabilities."""
-    print("🎮 SUPREMACY WW3 BOT — DEMO MODE")
+    print("SUPREMACY WW3 BOT — DEMO MODE")
     print("=" * 50)
     print()
 
@@ -184,7 +184,7 @@ def cities_mode(args):
                 print(inspector.inspect_city(prov))
                 break
         else:
-            print(f"❌ City '{args.city_detail}' not found")
+            print(f"City '{args.city_detail}' not found")
 
 
 def country_mode(args):
@@ -198,7 +198,7 @@ def country_mode(args):
     if country:
         print(country_summary(country))
     else:
-        print(f"❌ Country '{name}' not found. Available countries:")
+        print(f"Country '{name}' not found. Available countries:")
         for c in list_countries():
             print(f"   {c.name} ({c.tier.value}-tier)")
 
@@ -211,7 +211,7 @@ def auto_mode(args):
 
     mode_profile = get_mode_by_name(mode_name)
     if not mode_profile:
-        print(f"❌ Unknown mode '{mode_name}'. Available:")
+        print(f"Unknown mode '{mode_name}'. Available:")
         print(mode_selector_text())
         return
 
@@ -444,24 +444,24 @@ def live_mode(args):
     )
 
     if not args.server:
-        print(f"🔍 Discovering server for game {args.game_id}...")
+        print(f" Discovering server for game {args.game_id}...")
         try:
             url = client.discover_server()
-            print(f"✅ Found: {url}")
+            print(f"Found: {url}")
         except Exception as e:
-            print(f"❌ Could not find game: {e}")
+            print(f"Could not find game: {e}")
             sys.exit(1)
 
     monitor = GameMonitor(client, speed=args.speed, poll_interval_minutes=args.interval)
 
     if args.monitor:
-        print(f"🔄 Monitoring game {args.game_id} (speed={args.speed}x, "
+        print(f"Monitoring game {args.game_id} (speed={args.speed}x, "
               f"poll every {args.interval}min)...")
         print("Press Ctrl+C to stop.\n")
         try:
             monitor.run()
         except KeyboardInterrupt:
-            print("\n👋 Stopped.")
+            print("\nStopped.")
     else:
         report = monitor.check()
         print(report)
@@ -560,7 +560,7 @@ Examples:
         interactive_setup()
     elif args.logout:
         delete_config()
-        print("✅ Logged out. Config removed.")
+        print("Logged out. Config removed.")
     elif args.spy:
         spy_mode(args)
     elif args.diplo:
@@ -611,7 +611,7 @@ Examples:
         # Auto-load config if no flags given
         config = load_config()
         if config and config.get("game_id") and config.get("auth_token"):
-            print(f"📋 Using saved config: {config['username']} → Game {config['game_id']}")
+            print(f"Using saved config: {config['username']} → Game {config['game_id']}")
             args.game_id = config["game_id"]
             args.auth_token = args.auth_token or config.get("auth_token", "")
             args.server = args.server or config.get("server_url", "")
@@ -619,7 +619,7 @@ Examples:
             live_mode(args)
         else:
             parser.print_help()
-            print("\n💡 Quick start:")
+            print("\n Quick start:")
             print("   python -m sww3bot --demo          # Demo mode")
             print("   python -m sww3bot --setup         # Login wizard")
             print("   python -m sww3bot --resources     # Resource dashboard")

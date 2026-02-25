@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""
-SWW3 AI Agent — Terminal UI with Gradient SDK (do-ai.run).
-
-Features:
-- TUI: top=agent output/log, bottom=input box
-- Function calling via OpenAI-compatible API
-- Web search for strategy info
-- Game selector support
-
-Usage:
-    python tui_agent.py                    # Interactive TUI
-    python tui_agent.py "command here"     # Single command
-    python tui_agent.py --auto             # Auto-play loop
-"""
+"""Terminal UI agent using Gradient SDK (OpenAI-compatible)."""
 
 import sys, os, json, time, traceback, textwrap, threading, re
 
@@ -22,7 +9,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import requests as http_requests
 from actions import TOOLS, refresh, _connect
 
-# ── Config (API key from env, NEVER hardcoded) ───────────
 API_KEY = os.environ.get('GRADIENT_API_KEY', '')
 API_URL = os.environ.get('GRADIENT_API_URL', 'https://inference.do-ai.run/v1/chat/completions')
 MODEL = os.environ.get('GRADIENT_MODEL', 'llama3.3-70b-instruct')
@@ -204,16 +190,16 @@ class GradientAgent:
                     self.model = model
                     return r.json()
                 elif r.status_code == 429:
-                    self._log(f"  ⏳ Rate limited on {model}, trying next...")
+                    self._log(f"  [WAIT] Rate limited on {model}, trying next...")
                     continue
                 elif r.status_code == 401:
-                    self._log(f"  ⚠️ {model} not available, trying next...")
+                    self._log(f"  [WARN] {model} not available, trying next...")
                     continue
                 else:
-                    self._log(f"  ❌ {model}: HTTP {r.status_code}")
+                    self._log(f"  [ERR] {model}: HTTP {r.status_code}")
                     continue
             except Exception as e:
-                self._log(f"  ❌ {model}: {e}")
+                self._log(f"  [ERR] {model}: {e}")
                 continue
 
         return None
@@ -226,7 +212,7 @@ class GradientAgent:
         for round_num in range(max_rounds):
             resp = self._api_call(self.messages, self.tools)
             if not resp:
-                return "❌ All models failed. Check API key and connection."
+                return "[ERR] All models failed. Check API key and connection."
 
             choice = resp.get('choices', [{}])[0]
             msg = choice.get('message', {})
@@ -248,12 +234,12 @@ class GradientAgent:
                     tc_id = tc.get('id', f'call_{round_num}')
 
                     args_str = ', '.join(f'{k}={v}' for k, v in args.items())
-                    self._log(f"  ⚡ {name}({args_str})")
+                    self._log(f"  [CALL] {name}({args_str})")
 
                     result_str = _execute_function(name, args)
 
                     preview = result_str[:200] + '...' if len(result_str) > 200 else result_str
-                    self._log(f"  📋 → {preview}")
+                    self._log(f"  [RESULT] {preview}")
 
                     self.messages.append({
                         'role': 'tool',
@@ -269,18 +255,14 @@ class GradientAgent:
                 return content
             return '(no response)'
 
-        return "⚠️ Max rounds reached."
+        return "[WARN] Max rounds reached."
 
     def connect_game(self):
         """Connect to the game server."""
-        self._log("🔌 Connecting to game server...")
+        self._log("[CONN] Connecting to game server...")
         _connect()
-        self._log("✅ Connected!")
+        self._log("[OK] Connected!")
 
-
-# ═══════════════════════════════════════════════════════════
-#  TUI (Terminal UI) with curses
-# ═══════════════════════════════════════════════════════════
 
 def run_tui(agent):
     """Run the TUI interface."""
@@ -288,10 +270,10 @@ def run_tui(agent):
         import curses
         curses.wrapper(lambda stdscr: _tui_main(stdscr, agent))
     except ImportError:
-        print("⚠️ curses not available, falling back to simple mode")
+        print("[WARN] curses not available, falling back to simple mode")
         run_simple(agent)
     except Exception as e:
-        print(f"⚠️ TUI error: {e}, falling back to simple mode")
+        print(f"[WARN] TUI error: {e}, falling back to simple mode")
         run_simple(agent)
 
 
@@ -338,14 +320,12 @@ def _tui_main(stdscr, agent):
         if h < 6 or w < 20:
             return
 
-        # ── Header bar (line 0) ──
         header = f" SWW3 AI COMMANDER  |  Nigeria (P88)  |  {agent.model}  |  {len(TOOLS)+1} tools "
         try:
             stdscr.addnstr(0, 0, header.center(w), w, curses.color_pair(5) | curses.A_BOLD)
         except curses.error:
             pass
 
-        # ── Output area (lines 1 to h-4) ──
         output_h = h - 4  # header(1) + separator(1) + input(1) + status(1)
         if scroll_offset > max(0, len(output_lines) - output_h):
             scroll_offset = max(0, len(output_lines) - output_h)
@@ -369,7 +349,6 @@ def _tui_main(stdscr, agent):
             except curses.error:
                 pass
 
-        # ── Separator (h-3) ──
         sep_y = h - 3
         scroll_ind = f" [scroll:{scroll_offset}]" if scroll_offset > 0 else ""
         help_text = f" /help /status /search /conquer /quit{scroll_ind} "
@@ -379,7 +358,6 @@ def _tui_main(stdscr, agent):
         except curses.error:
             pass
 
-        # ── Input line (h-2) ──
         input_y = h - 2
         prompt = "> "
         try:
@@ -393,7 +371,6 @@ def _tui_main(stdscr, agent):
         except curses.error:
             pass
 
-        # ── Status bar (h-1) ──
         status_y = h - 1
         if processing:
             elapsed = time.time() - processing if isinstance(processing, float) else 0
@@ -420,46 +397,37 @@ def _tui_main(stdscr, agent):
     agent.verbose = False
     def tui_log(msg):
         nonlocal tool_count
-        if '⚡' in msg:
+        if '[CALL]' in msg:
             tool_count += 1
             add_output(msg, 2)
-        elif '📋' in msg:
+        elif '[RESULT]' in msg:
             add_output(msg, 2)
-        elif '❌' in msg:
+        elif '[ERR]' in msg:
             add_output(msg, 4)
-        elif '✅' in msg or '🔌' in msg:
+        elif '[OK]' in msg or '[CONN]' in msg:
             add_output(msg, 1)
-        elif '⏳' in msg or '🔄' in msg:
+        elif '[WAIT]' in msg or '[RETRY]' in msg:
             add_output(msg, 3)
         else:
             add_output(msg, 3)
         draw()
     agent._log = tui_log
 
-    # Welcome
-    add_output("╔═══════════════════════════════════════════════════════╗", 1)
-    add_output("║  SWW3 AI COMMANDER — Terminal UI                      ║", 1)
-    add_output("║                                                       ║", 1)
-    add_output("║  Commands:                                            ║", 1)
-    add_output("║    /status     — quick game status                    ║", 1)
-    add_output("║    /conquer    — full conquest cycle                  ║", 1)
-    add_output("║    /search Q   — search web for Q                    ║", 1)
-    add_output("║    /threats    — scan for enemy threats               ║", 1)
-    add_output("║    /expand     — smart expansion analysis             ║", 1)
-    add_output("║    /help       — show all shortcuts                   ║", 1)
-    add_output("║    /quit       — exit                                 ║", 1)
-    add_output("║                                                       ║", 1)
-    add_output("║  Or type any command in Bahasa Indonesia!              ║", 1)
-    add_output("║  Example: 'bangun army base di semua kota'            ║", 1)
-    add_output("╚═══════════════════════════════════════════════════════╝", 1)
+    add_output("SWW3 AI COMMANDER", 1)
+    add_output("", 0)
+    add_output("  /status   game dashboard        /conquer  full conquest cycle", 1)
+    add_output("  /threats  scan enemy movement    /expand   expansion targets", 1)
+    add_output("  /armies   list armies            /cities   list cities", 1)
+    add_output("  /search Q web search             /help     all shortcuts", 1)
+    add_output("  /quit     exit", 1)
     add_output("")
 
     # Connect
     try:
         agent.connect_game()
-        add_output("✅ Game server connected!", 1)
+        add_output("[OK] Game server connected!", 1)
     except Exception as e:
-        add_output(f"❌ Connection failed: {e}", 4)
+        add_output(f"[ERR] Connection failed: {e}", 4)
 
     draw()
 
@@ -507,7 +475,7 @@ def _tui_main(stdscr, agent):
                 break
 
             if cmd.lower() == '/help':
-                add_output("\n📖 Shortcuts:", 3)
+                add_output("\n[HELP] Shortcuts:", 3)
                 for sc, desc in SLASH_CMDS.items():
                     add_output(f"  {sc:12s} — {desc}", 2)
                 add_output("")
@@ -528,7 +496,7 @@ def _tui_main(stdscr, agent):
                 cmd = f"Search web: {cmd[8:]}"
 
             add_output(f"\n{'─'*40}", 3)
-            add_output(f"🎮 You > {cmd}", 3)
+            add_output(f"[>] You > {cmd}", 3)
             scroll_offset = 0
             draw()
 
@@ -538,7 +506,7 @@ def _tui_main(stdscr, agent):
 
             try:
                 result = agent.execute(cmd)
-                add_output(f"\n🤖 Agent >\n{result}", 8)
+                add_output(f"\n[BOT] Agent >\n{result}", 8)
                 # Try to extract game info from status results
                 if 'day' in str(agent.messages[-2:]).lower():
                     try:
@@ -553,7 +521,7 @@ def _tui_main(stdscr, agent):
                     except:
                         pass
             except Exception as e:
-                add_output(f"\n❌ Error: {e}", 4)
+                add_output(f"\n[ERR] Error: {e}", 4)
 
             processing = False
             add_output("")
@@ -620,28 +588,22 @@ def _tui_main(stdscr, agent):
 
 
 def run_simple(agent):
-    """Simple fallback mode (no curses)."""
-    print("╔══════════════════════════════════════════════════╗")
-    print("║  🤖 SWW3 AI COMMANDER — Simple Mode              ║")
-    print(f"║  Model: {agent.model.ljust(41)}║")
-    print("║  Ketik perintah, Enter untuk kirim               ║")
-    print("║  /search <query> = cari web | /quit = keluar     ║")
-    print("╚══════════════════════════════════════════════════╝\n")
+    print(f"SWW3 AI COMMANDER (simple mode) | {agent.model}")
+    print("Type commands or /quit to exit.\n")
 
     agent.connect_game()
     print()
 
     while True:
         try:
-            user_input = input("🎮 You > ").strip()
+            user_input = input("> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\n👋 Bye!")
+            print("\nExiting.")
             break
 
         if not user_input:
             continue
         if user_input.lower() in ('/quit', '/exit', '/q', 'quit', 'exit'):
-            print("👋 Bye!")
             break
 
         if user_input.lower() == '/status':
@@ -651,7 +613,7 @@ def run_simple(agent):
 
         print()
         result = agent.execute(user_input)
-        print(f"\n🤖 Agent > {result}\n")
+        print(f"\n[BOT] Agent > {result}\n")
 
 
 def main():
@@ -666,8 +628,7 @@ def main():
     args = parser.parse_args()
 
     if not API_KEY:
-        print("❌ API key required!")
-        print("   Set: export GRADIENT_API_KEY='your-key-here'")
+        print("Error: GRADIENT_API_KEY not set")
         sys.exit(1)
 
     agent = GradientAgent()
@@ -678,27 +639,25 @@ def main():
 
     if args.auto:
         agent.connect_game()
-        print(f"🤖 Auto-play: conquest cycle every {args.interval} min")
+        print(f"Auto-play: conquest cycle every {args.interval} min")
         while True:
             print(f"\n{'='*50}")
-            print(f"⏰ {time.strftime('%H:%M:%S')} — Running cycle...")
+            print(f"{time.strftime('%H:%M:%S')} running cycle...")
             try:
                 result = agent.execute("Jalankan full conquest cycle dan laporkan hasilnya.")
                 print(f"\n{result}")
             except Exception as e:
-                print(f"❌ {e}")
-            print(f"💤 Next in {args.interval} min...")
+                print(f"Error: {e}")
+            print(f"Next in {args.interval} min...")
             try:
                 time.sleep(args.interval * 60)
             except KeyboardInterrupt:
-                print("\n🛑 Stopped.")
                 break
         return
 
     if args.command:
         agent.connect_game()
         cmd = ' '.join(args.command)
-        print(f"🎯 Command: {cmd}\n")
         result = agent.execute(cmd)
         print(f"\n{result}")
         return

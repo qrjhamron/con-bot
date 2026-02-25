@@ -33,7 +33,7 @@ def main():
     else:
         unit_type = UNIT_SHORTCUTS.get(args.unit.lower())
         if not unit_type:
-            print(f"❌ Unknown unit '{args.unit}'")
+            print(f"Unknown unit '{args.unit}'")
             print(f"Available: {', '.join(sorted(UNIT_SHORTCUTS.keys()))}")
             return
 
@@ -53,7 +53,7 @@ def main():
     if not template:
         avail = [f"{unit_name(i.get('unit',{}).get('t',0))} (T{i.get('unit',{}).get('t',0)})" 
                  for i in qp_items if isinstance(i, dict)]
-        print(f"❌ {unit_name(unit_type)} not available in P{args.city}")
+        print(f"{unit_name(unit_type)} not available in P{args.city}")
         print(f"Available: {', '.join(avail) if avail else 'None'}")
         return
     
@@ -61,11 +61,11 @@ def main():
     ar = ctrl._extract_action_result(result)
     
     if ar == 1:
-        print(f"✅ Producing {unit_name(unit_type)} in P{args.city}")
+        print(f"Producing {unit_name(unit_type)} in P{args.city}")
     else:
         res = ge.get_resources()
         mp = res.get('Manpower', {}).get('amount', 0)
-        print(f"❌ Failed (ar={ar}) — Manpower: {mp:.0f}")
+        print(f"Failed (ar={ar}) — Manpower: {mp:.0f}")
 
 if __name__ == '__main__':
     main()

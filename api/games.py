@@ -59,24 +59,22 @@ def list_games():
             pass
 
     cfg = load_config()
-    print("╔══════════════════════════════════════════════╗")
-    print("║  🎮 AVAILABLE GAMES                          ║")
-    print("╠══════════════════════════════════════════════╣")
+    print("AVAILABLE GAMES")
+    print()
 
     if games:
         for g in games:
             gid = g.get('gameID', g.get('id', '?'))
             mode = g.get('scenarioName', g.get('mode', '?'))
             nation = g.get('nationName', '?')
-            active = '✅' if gid == cfg.get('game_id') else '  '
-            print(f"║  {active} Game {gid} | {mode} | {nation}")
+            active = '*' if gid == cfg.get('game_id') else ' '
+            print(f"  {active} Game {gid} | {mode} | {nation}")
     else:
-        print(f"║  Could not fetch game list from API")
+        print("  Could not fetch game list from API")
 
-    print("╠══════════════════════════════════════════════╣")
-    print(f"║  🎯 Active: Game {cfg['game_id']} | P{cfg['player_id']} | {cfg['nation']}")
-    print(f"║  📋 Mode: {cfg['mode']}")
-    print("╚══════════════════════════════════════════════╝")
+    print()
+    print(f"Active: Game {cfg['game_id']} | P{cfg['player_id']} | {cfg['nation']}")
+    print(f"Mode: {cfg['mode']}")
     return cfg
 
 
@@ -89,7 +87,7 @@ def select_game(game_id, player_id=None, nation=None):
     if nation:
         cfg['nation'] = nation
     save_config(cfg)
-    print(f"✅ Selected Game {game_id} | P{cfg['player_id']} | {cfg['nation']}")
+    print(f"Selected Game {game_id} | P{cfg['player_id']} | {cfg['nation']}")
     return cfg
 
 
@@ -99,14 +97,12 @@ def game_info(game_id):
     auth.login(BOT_USER, BOT_PASS)
     try:
         ga = auth.get_game_auth(int(game_id))
-        print(f"╔══════════════════════════════════════════════╗")
-        print(f"║  🎮 Game {game_id}")
-        print(f"║  Server: {ga.get('gs', '?')}")
-        print(f"║  Auth: {'OK' if ga.get('auth') else 'FAIL'}")
-        print(f"╚══════════════════════════════════════════════╝")
+        print(f"Game {game_id}")
+        print(f"  Server: {ga.get('gs', '?')}")
+        print(f"  Auth: {'OK' if ga.get('auth') else 'FAIL'}")
         return ga
     except Exception as e:
-        print(f"❌ Cannot access game {game_id}: {e}")
+        print(f"Cannot access game {game_id}: {e}")
         return None
 
 

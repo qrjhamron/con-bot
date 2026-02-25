@@ -14,7 +14,7 @@ def main():
     result = ctrl.build_building(args.province, args.building)
     ar = ctrl._extract_action_result(result)
     name = building_name(args.building)
-    print(f"{'✅' if ar==1 else '❌'} Build {name} in P{args.province} (ar={ar})")
+    print(f"{'OK' if ar==1 else 'FAIL'} Build {name} in P{args.province} (ar={ar})")
 
 if __name__ == '__main__':
     main()

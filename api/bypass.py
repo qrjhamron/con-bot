@@ -35,9 +35,7 @@ def run_bypass(dry_run=False):
 
     summary = {'wars': [], 'armies': [], 'production': [], 'buildings': [], 'errors': []}
 
-    # ═══════════════════════════════════════════════════════
     # 1. AUTO WAR — re-declare on all weak AI bots
-    # ═══════════════════════════════════════════════════════
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
     our_rels = nr.get('88', {})
     at_war = {int(k) for k, v in our_rels.items() if isinstance(v, (int, float)) and v == -2}
@@ -57,16 +55,14 @@ def run_bypass(dry_run=False):
                 r = ctrl.declare_war(pid)
                 ar = _extract_ar(r)
                 if ar == 1:
-                    summary['wars'].append(f"⚔️ WAR → {p.get('nationName','')} ({provs}p)")
+                    summary['wars'].append(f"WAR → {p.get('nationName','')} ({provs}p)")
                     at_war.add(pid)
             except Exception as e:
                 summary['errors'].append(f"War P{pid}: {e}")
         else:
             summary['wars'].append(f"[DRY] WAR → {p.get('nationName','')} ({provs}p)")
 
-    # ═══════════════════════════════════════════════════════
     # 2. SMART ARMY DEPLOYMENT
-    # ═══════════════════════════════════════════════════════
     # Find idle armies
     idle_armies = []
     for aid, a in armies_data.items():
@@ -118,15 +114,13 @@ def run_bypass(dry_run=False):
                     r = ctrl.move_army(aid, best['id'])
                     ar = _extract_ar(r)
                     if ar == 1:
-                        summary['armies'].append(f"🚀 #{aid} ({army_hp(a):.0f}HP) → P{best['id']} ({nation})")
+                        summary['armies'].append(f"> #{aid} ({army_hp(a):.0f}HP) → P{best['id']} ({nation})")
                 except Exception as e:
                     summary['errors'].append(f"Move #{aid}: {e}")
             else:
                 summary['armies'].append(f"[DRY] #{aid} → P{best['id']} ({nation})")
 
-    # ═══════════════════════════════════════════════════════
     # 3. AUTO-PRODUCE — all idle cities (refresh state for fresh queueableProductions)
-    # ═══════════════════════════════════════════════════════
     priority_units = [10141, 3294, 3308, 3322, 3373]  # Infantry → Mot.Inf → Heli → MBT → SAM
 
     try:
@@ -158,7 +152,7 @@ def run_bypass(dry_run=False):
                     r = ctrl.produce_unit(pid, uid)
                     ar = _extract_ar(r)
                     if ar == 1:
-                        summary['production'].append(f"🏭 P{pid}: {unit_name(uid)}")
+                        summary['production'].append(f"[PROD] P{pid}: {unit_name(uid)}")
                         break
                 except:
                     continue
@@ -166,9 +160,7 @@ def run_bypass(dry_run=False):
                 summary['production'].append(f"[DRY] P{pid}: {unit_name(uid)}")
                 break
 
-    # ═══════════════════════════════════════════════════════
     # 4. AUTO-BUILD — infrastructure in new/empty cities
-    # ═══════════════════════════════════════════════════════
     essential_buildings = [2245, 2250, 2271, 2016]  # Recruiting Office, Local Industry, Army Base, Arms Industry
 
     for loc in locs:
@@ -203,7 +195,7 @@ def run_bypass(dry_run=False):
                         r = ctrl.build_building(pid, bid)
                         ar = _extract_ar(r)
                         if ar == 1:
-                            summary['buildings'].append(f"🏗️ P{pid}: {building_name(bid)}")
+                            summary['buildings'].append(f"[CONST] P{pid}: {building_name(bid)}")
                             break
                     except:
                         continue
@@ -226,38 +218,38 @@ def _extract_ar(response):
 def print_summary(summary):
     """Print bypass cycle summary."""
     print(f"\n{'='*50}")
-    print(f"  🔄 BYPASS CYCLE COMPLETE — {time.strftime('%H:%M:%S')}")
+    print(f"  BYPASS CYCLE COMPLETE — {time.strftime('%H:%M:%S')}")
     print(f"{'='*50}")
 
     if summary['wars']:
-        print(f"\n  ⚔️ Wars Declared ({len(summary['wars'])})")
+        print(f"\n  Wars Declared ({len(summary['wars'])})")
         for w in summary['wars'][:10]:
             print(f"    {w}")
         if len(summary['wars']) > 10:
             print(f"    ... +{len(summary['wars'])-10} more")
 
     if summary['armies']:
-        print(f"\n  🚀 Armies Deployed ({len(summary['armies'])})")
+        print(f"\n  > Armies Deployed ({len(summary['armies'])})")
         for a in summary['armies']:
             print(f"    {a}")
 
     if summary['production']:
-        print(f"\n  🏭 Production Started ({len(summary['production'])})")
+        print(f"\n  [PROD] Production Started ({len(summary['production'])})")
         for p in summary['production']:
             print(f"    {p}")
 
     if summary['buildings']:
-        print(f"\n  🏗️ Buildings Queued ({len(summary['buildings'])})")
+        print(f"\n  [CONST] Buildings Queued ({len(summary['buildings'])})")
         for b in summary['buildings']:
             print(f"    {b}")
 
     if summary['errors']:
-        print(f"\n  ❌ Errors ({len(summary['errors'])})")
+        print(f"\n  Errors ({len(summary['errors'])})")
         for e in summary['errors'][:5]:
             print(f"    {e}")
 
     total = len(summary['wars']) + len(summary['armies']) + len(summary['production']) + len(summary['buildings'])
-    print(f"\n  📊 Total actions: {total}")
+    print(f"\n  Total actions: {total}")
     print(f"{'='*50}")
 
 
@@ -268,19 +260,19 @@ def main():
     args = parser.parse_args()
 
     if args.loop:
-        print(f"🔄 Auto-bypass loop: every {args.loop} minutes")
+        print(f"Auto-bypass loop: every {args.loop} minutes")
         print("   Press Ctrl+C to stop\n")
         while True:
             try:
                 summary = run_bypass(dry_run=False)
                 print_summary(summary)
-                print(f"\n💤 Next cycle in {args.loop} minutes...")
+                print(f"\nNext cycle in {args.loop} minutes...")
                 time.sleep(args.loop * 60)
             except KeyboardInterrupt:
-                print("\n🛑 Stopped.")
+                print("\nStopped.")
                 break
             except Exception as e:
-                print(f"❌ Error: {e}")
+                print(f"Error: {e}")
                 time.sleep(60)
     else:
         summary = run_bypass(dry_run=args.status)

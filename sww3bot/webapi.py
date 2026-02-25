@@ -135,9 +135,7 @@ class BytroWebAPI:
 
         return result
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 1: Game Token — spy on ANY game
-    # ═══════════════════════════════════════════
 
     def get_game_token(self, game_id: int) -> dict:
         """
@@ -150,9 +148,7 @@ class BytroWebAPI:
         """
         return self._request("getGameToken", {"gameID": game_id})
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 2: Player Profiling
-    # ═══════════════════════════════════════════
 
     # Full list of user detail options (from BytroFront allUserOptionsArray)
     ALL_USER_OPTIONS = [
@@ -178,9 +174,7 @@ class BytroWebAPI:
         """Search for players by username. Returns userID, avatar, status."""
         return self._request("searchUser", {"username": username})
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 3: Direct Messaging (auto-diplomacy)
-    # ═══════════════════════════════════════════
 
     def send_message(self, target_user_id: int, subject: str, body: str) -> dict:
         """
@@ -197,9 +191,7 @@ class BytroWebAPI:
             "mode": "pm",
         })
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 4: Game Search & Discovery
-    # ═══════════════════════════════════════════
 
     def search_games(
         self,
@@ -228,9 +220,7 @@ class BytroWebAPI:
             data["scenarioID"] = scenario_id
         return self._request("getGames", data)
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 5: Content/Unit Database
-    # ═══════════════════════════════════════════
 
     def get_content_items(self, lang: str = "en") -> dict:
         """
@@ -255,9 +245,7 @@ class BytroWebAPI:
             "item_packs": 1,
         })
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 6: Alliance Intelligence
-    # ═══════════════════════════════════════════
 
     def get_alliance(self, alliance_id: int, members: bool = True) -> dict:
         """Get alliance details including member list."""
@@ -282,9 +270,7 @@ class BytroWebAPI:
             "numEntries": min(50, max(10, num_entries)),
         })
 
-    # ═══════════════════════════════════════════
     # EXPLOIT 7: Player Rankings
-    # ═══════════════════════════════════════════
 
     RANKING_TYPES = [
         "globalRank", "monthRank", "weekRank",
@@ -305,9 +291,7 @@ class BytroWebAPI:
             "numEntries": min(50, max(5, num_entries)),
         })
 
-    # ═══════════════════════════════════════════
     # Game Server Bridge (stateType requests)
-    # ═══════════════════════════════════════════
 
     def game_state(self, game_id: int, state_type: int = 0, option: int = 0) -> dict:
         """

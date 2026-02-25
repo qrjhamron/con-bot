@@ -58,16 +58,16 @@ def main():
         c = loc.get('c', {})
         if isinstance(c, dict) and c.get('x'):
             mx, my = to_map(c['x'], c['y'])
-            grid[my][mx] = '★' if army_hp(a) >= 50 else '☆'
+            grid[my][mx] = '*' if army_hp(a) >= 50 else 'o'
     
-    print(f"╔{'═'*MAP_W}╗")
-    print(f"║{'🌍 AFRICA MAP — Nigeria (P88)':^{MAP_W}}║")
-    print(f"╠{'═'*MAP_W}╣")
+    print(f"+{'='*MAP_W}+")
+    print(f"|{' AFRICA MAP — Nigeria (P88)':^{MAP_W}}|")
+    print(f"+{'='*MAP_W}+")
     for row in grid:
-        print(f"║{''.join(row)}║")
-    print(f"╠{'═'*MAP_W}╣")
-    print(f"║{'█=Nigeria ▓=Morocco ░=Ghana ▒=Niger ★☆=Army ·=Other':^{MAP_W}}║")
-    print(f"╚{'═'*MAP_W}╝")
+        print(f"|{''.join(row)}|")
+    print(f"+{'='*MAP_W}+")
+    print(f"|{'█=Nigeria ▓=Morocco ░=Ghana ▒=Niger *o=Army ·=Other':^{MAP_W}}|")
+    print(f"+{'='*MAP_W}+")
 
 if __name__ == '__main__':
     main()

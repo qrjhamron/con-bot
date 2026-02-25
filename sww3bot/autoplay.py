@@ -26,7 +26,6 @@ from sww3bot.controller import (
 logger = logging.getLogger(__name__)
 
 
-# ── Unit type IDs (from live game data) ─────────────────────
 UNIT_MOTORIZED_INF = 3294     # Motorized Infantry (researched)
 UNIT_ARMS_INDUSTRY = 10141   # Arms Industry special unit
 
@@ -79,7 +78,6 @@ class AutoPlayer:
         self.enable_army = self.config.get('auto_army', True)
         self.poll_interval = self.config.get('poll_interval', 60)
 
-    # ── State Parsing ────────────────────────────────────────
 
     def _get_our_provinces(self) -> List[dict]:
         """Get all provinces owned by us."""
@@ -266,7 +264,6 @@ class AutoPlayer:
 
         return {'upgrades': upgrades, 'productions': productions}
 
-    # ── Auto-Build Logic ────────────────────────────────────
 
     def auto_build_units(self) -> List[str]:
         """Produce units in cities with free production slots."""
@@ -304,11 +301,11 @@ class AutoPlayer:
                     result = self.ctrl.produce_unit(pid, unit_type, template)
                     ar = self.ctrl._extract_action_result(result)
                     if ar == 1:
-                        actions.append(f"🏭 Producing T{unit_type} in P{pid}")
+                        actions.append(f"[PROD] Producing T{unit_type} in P{pid}")
                     else:
-                        actions.append(f"❌ Produce T{unit_type} in P{pid} rejected")
+                        actions.append(f"Produce T{unit_type} in P{pid} rejected")
                 except Exception as e:
-                    actions.append(f"❌ Produce error P{pid}: {e}")
+                    actions.append(f"Produce error P{pid}: {e}")
                 break  # Only one production per city per tick
 
         return actions
@@ -351,14 +348,13 @@ class AutoPlayer:
                     result = self.ctrl.build_building(pid, bid)
                     ar = self.ctrl._extract_action_result(result)
                     if ar == 1:
-                        actions.append(f"🏗️ Building #{bid} in P{pid}")
+                        actions.append(f"[CONST] Building #{bid} in P{pid}")
                         break  # One building per city per tick
                 except Exception:
                     pass
 
         return actions
 
-    # ── Auto-Research Logic ──────────────────────────────────
 
     def auto_research_tech(self) -> List[str]:
         """Start research if slots available."""
@@ -366,7 +362,7 @@ class AutoPlayer:
         research = self._get_research_state()
 
         if research['free_slots'] <= 0:
-            actions.append("🔬 Research slots full")
+            actions.append(" Research slots full")
             return actions
 
         # Try research IDs in priority order
@@ -386,7 +382,7 @@ class AutoPlayer:
                     for k, v in ar.items() if k != '@c'
                 )
                 if success:
-                    actions.append(f"🔬 Started research R{rid}")
+                    actions.append(f" Started research R{rid}")
                     research['free_slots'] -= 1
                     if research['free_slots'] <= 0:
                         break
@@ -394,10 +390,9 @@ class AutoPlayer:
                 pass
 
         if not actions:
-            actions.append("🔬 No available research")
+            actions.append(" No available research")
         return actions
 
-    # ── Auto-Diplomacy Logic ─────────────────────────────────
 
     def auto_diplomacy(self) -> List[str]:
         """Offer ROW to non-enemy neighbors, manage wars."""
@@ -431,13 +426,12 @@ class AutoPlayer:
                 try:
                     self.ctrl.offer_right_of_way(pid)
                     name = player.get('name', f'P{pid}')
-                    actions.append(f"🤝 Offered ROW to {name} (P{pid})")
+                    actions.append(f"Offered ROW to {name} (P{pid})")
                 except Exception as e:
-                    actions.append(f"❌ ROW to P{pid} failed: {e}")
+                    actions.append(f"ROW to P{pid} failed: {e}")
 
         return actions
 
-    # ── Army Management Logic ────────────────────────────────
 
     def _find_border_provinces(self) -> List[dict]:
         """Find our provinces that border enemy territory."""
@@ -502,7 +496,7 @@ class AutoPlayer:
         }
 
         if not idle_armies:
-            actions.append("🎖️ All armies busy")
+            actions.append(" All armies busy")
             return actions
 
         # Check for nearby enemy threats
@@ -532,11 +526,11 @@ class AutoPlayer:
                     try:
                         self.ctrl.attack_army(int(aid), int(threat['id']))
                         actions.append(
-                            f"⚔️ Army #{aid} attacking enemy #{threat['id']} "
+                            f"Army #{aid} attacking enemy #{threat['id']} "
                             f"(str={astrength:.0f} vs {threat['strength']:.0f})"
                         )
                     except Exception as e:
-                        actions.append(f"❌ Attack failed #{aid}: {e}")
+                        actions.append(f"Attack failed #{aid}: {e}")
                     break
             else:
                 # No threats nearby — move to unguarded border
@@ -562,14 +556,13 @@ class AutoPlayer:
                         try:
                             self.ctrl.move_army(int(aid), target['id'])
                             actions.append(
-                                f"🚶 Army #{aid} → border P{target['id']}"
+                                f"> Army #{aid} → border P{target['id']}"
                             )
                         except Exception as e:
-                            actions.append(f"❌ Move #{aid} failed: {e}")
+                            actions.append(f"Move #{aid} failed: {e}")
 
         return actions
 
-    # ── Threat Detection ─────────────────────────────────────
 
     def detect_threats(self) -> List[dict]:
         """Scan for incoming enemy armies near our territory."""
@@ -600,7 +593,6 @@ class AutoPlayer:
 
         return sorted(threats, key=lambda t: t['distance'])
 
-    # ── Market Logic ─────────────────────────────────────────
 
     def auto_market_orders(self) -> List[str]:
         """Buy scarce resources, sell excess."""
@@ -629,14 +621,13 @@ class AutoPlayer:
                     try:
                         self.ctrl.buy_resource(res_id, buy_amount, max_price)
                         actions.append(
-                            f"💰 Buy {buy_amount} {name} @ {max_price}"
+                            f" Buy {buy_amount} {name} @ {max_price}"
                         )
                     except Exception as e:
-                        actions.append(f"❌ Market buy failed: {e}")
+                        actions.append(f"Market buy failed: {e}")
 
         return actions
 
-    # ── Main Game Loop ───────────────────────────────────────
 
     def tick(self) -> dict:
         """Execute one game tick — analyze state and take actions."""
@@ -660,7 +651,7 @@ class AutoPlayer:
             results['threats'] = threats
             for t in threats[:3]:
                 results['actions'].append(
-                    f"⚠️ THREAT: Enemy P{t['owner']} army "
+                    f"THREAT: Enemy P{t['owner']} army "
                     f"#{t['army_id']} dist={t['distance']:.0f} "
                     f"str={t['strength']:.1f}"
                 )
@@ -695,19 +686,19 @@ class AutoPlayer:
         try:
             self.ctrl.refresh_state()
         except Exception as e:
-            return f"❌ State refresh failed: {e}"
+            return f"State refresh failed: {e}"
 
         states = self.ctrl.state.get('states', {})
         s12 = states.get('12', {})
         day = s12.get('dayOfGame', 0)
 
         lines.append("=" * 60)
-        lines.append(f"🤖 AUTO-PLAY STATUS — Day {day} | Tick #{self.tick_count}")
+        lines.append(f"AUTO-PLAY STATUS — Day {day} | Tick #{self.tick_count}")
         lines.append("=" * 60)
 
         # Resources summary
         resources = self._get_resources()
-        lines.append("\n💰 RESOURCES:")
+        lines.append("\n RESOURCES:")
         for res_id in [RES_SUPPLIES, RES_COMPONENTS, RES_MANPOWER,
                        RES_FUEL, RES_ELECTRONICS, RES_MONEY]:
             r = resources.get(res_id, {})
@@ -727,14 +718,14 @@ class AutoPlayer:
                        if a.get('ps') == PS_BUILDING)
         total_str = sum(self._army_strength(a) for a in our_armies.values())
 
-        lines.append(f"\n🎖️ ARMIES ({len(our_armies)}): "
+        lines.append(f"\n ARMIES ({len(our_armies)}): "
                      f"{idle} idle, {moving} moving, "
                      f"{garrison} garrison, {building} building")
         lines.append(f"   Total strength: {total_str:.1f}")
 
         for aid, a in sorted(our_armies.items()):
-            status = {PS_BUILDING: "🔨", PS_MOVING: "🚶",
-                      PS_GARRISON: "🏰"}.get(a.get('ps', 0), "⏸️")
+            status = {PS_BUILDING: "[BUILD]", PS_MOVING: ">",
+                      PS_GARRISON: "[G]"}.get(a.get('ps', 0), "[P]")
             idle_flag = " [IDLE]" if self._army_is_idle(a) else ""
             s = self._army_strength(a)
             lines.append(f"   #{aid} {status} loc={a.get('l')} "
@@ -742,7 +733,7 @@ class AutoPlayer:
                         f"/{a.get('mhp',0):.0f}{idle_flag}")
 
         # Production
-        lines.append("\n🏭 PRODUCTION:")
+        lines.append("\n[PROD] PRODUCTION:")
         for prov in self._get_our_provinces():
             if prov.get('plv', 0) < 3:
                 continue
@@ -753,19 +744,19 @@ class AutoPlayer:
                 for item in prod['items']:
                     if item:
                         remaining = (item['end_time'] - time.time() * 1000) / 3600000
-                        prod_items.append(f"⚔️T{item['unit_type']}({remaining:.1f}h)")
+                        prod_items.append(f"T{item['unit_type']}({remaining:.1f}h)")
                     else:
-                        prod_items.append("🟢")
+                        prod_items.append("")
                 bld_items = []
                 for item in construction['items']:
                     if item:
                         remaining = (item['end_time'] - time.time() * 1000) / 3600000
-                        bld_items.append(f"🏗#{item['upgrade_id']}({remaining:.1f}h)")
+                        bld_items.append(f"[B]#{item['upgrade_id']}({remaining:.1f}h)")
                 lines.append(f"   P{prov['id']}: prod=[{' '.join(prod_items)}] bld=[{' '.join(bld_items)}]")
 
         # Research
         research = self._get_research_state()
-        lines.append(f"\n🔬 RESEARCH: {research['free_slots']}/"
+        lines.append(f"\n RESEARCH: {research['free_slots']}/"
                      f"{research['slots']} slots free, "
                      f"{len(research['completed'])} completed")
         for r in research['current']:
@@ -785,19 +776,19 @@ class AutoPlayer:
                     f"{p.get('nationName', f'P{w}')} "
                     f"({p.get('vps', 0)} VP)"
                 )
-            lines.append(f"\n🔥 AT WAR: {', '.join(war_names)}")
+            lines.append(f"\n AT WAR: {', '.join(war_names)}")
 
         # Threats
         threats = self.detect_threats()
         if threats:
-            lines.append(f"\n⚠️ THREATS ({len(threats)}):")
+            lines.append(f"\nTHREATS ({len(threats)}):")
             for t in threats[:5]:
                 lines.append(f"   Enemy P{t['owner']} #{t['army_id']} "
                             f"dist={t['distance']:.0f} str={t['strength']:.1f}")
 
         # Last actions
         if self._last_actions:
-            lines.append(f"\n📋 LAST ACTIONS:")
+            lines.append(f"\nLAST ACTIONS:")
             for a in self._last_actions:
                 lines.append(f"   {a}")
 
@@ -810,7 +801,7 @@ class AutoPlayer:
             max_ticks: Max ticks to run (0 = infinite)
             verbose: Print status each tick
         """
-        print("🤖 Auto-Play Engine Starting...")
+        print("Auto-Play Engine Starting...")
         print(f"   Poll interval: {self.poll_interval}s")
         print(f"   Auto-build: {self.enable_build}")
         print(f"   Auto-research: {self.enable_research}")
@@ -836,15 +827,15 @@ class AutoPlayer:
                         logger.info(a)
 
             except KeyboardInterrupt:
-                print("\n🛑 Auto-play stopped by user")
+                print("\nAuto-play stopped by user")
                 break
             except Exception as e:
                 logger.error(f"Tick error: {e}")
-                print(f"❌ Error in tick {tick_num}: {e}")
+                print(f"Error in tick {tick_num}: {e}")
 
             if max_ticks and tick_num >= max_ticks:
                 break
 
             time.sleep(self.poll_interval)
 
-        print(f"🏁 Auto-play finished after {tick_num} ticks")
+        print(f" Auto-play finished after {tick_num} ticks")

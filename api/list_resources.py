@@ -23,7 +23,7 @@ def main():
     
     # Goldmark
     gm = ge.get_goldmark()
-    print(f"\n💎 Goldmark: {gm}")
+    print(f"\n Goldmark: {gm}")
 
 if __name__ == '__main__':
     main()

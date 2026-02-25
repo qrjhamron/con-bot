@@ -308,7 +308,7 @@ class NewspaperParser:
         """Render newspaper intelligence report."""
         intel = intel or self._intel
         lines = [
-            f"📰 NEWSPAPER INTELLIGENCE — Day {intel.game_day}",
+            f" NEWSPAPER INTELLIGENCE — Day {intel.game_day}",
             "=" * 60,
             "",
         ]
@@ -316,20 +316,20 @@ class NewspaperParser:
         # War declarations
         wars = [e for e in intel.diplomatic_events if e.event_type == "war_declared"]
         if wars:
-            lines.append("⚔️ WAR DECLARATIONS")
+            lines.append("WAR DECLARATIONS")
             for w in wars[-10:]:
                 is_me = w.player_a_id in self.my_ids or w.player_b_id in self.my_ids
-                icon = "🚨" if is_me else "⚔️"
+                icon = "" if is_me else ""
                 lines.append(f"  {icon} Day {w.day}: {w.player_a_name} declared war on {w.player_b_name}")
             lines.append("")
 
         # Recent battles
         if intel.battles:
-            lines.append(f"💥 BATTLE LOG ({len(intel.battles)} total)")
+            lines.append(f"BATTLE LOG ({len(intel.battles)} total)")
             for b in intel.battles[-8:]:
                 winner = b.attacker_name if b.victor == "attacker" else b.defender_name
                 is_me = b.attacker_id in self.my_ids or b.defender_id in self.my_ids
-                icon = "🔥" if is_me else "💥"
+                icon = "" if is_me else ""
                 lines.append(
                     f"  {icon} Day {b.day}: {b.attacker_name} vs {b.defender_name} "
                     f"at {b.province_name} → {winner} wins "
@@ -339,16 +339,16 @@ class NewspaperParser:
 
         # Territory changes
         if intel.captures:
-            lines.append(f"🏴 TERRITORY CHANGES ({len(intel.captures)} captures)")
+            lines.append(f" TERRITORY CHANGES ({len(intel.captures)} captures)")
             for c in intel.captures[-8:]:
                 is_me_gain = c.new_owner_id in self.my_ids
                 is_me_loss = c.old_owner_id in self.my_ids
                 if is_me_gain:
-                    icon = "🟢"
+                    icon = ""
                 elif is_me_loss:
-                    icon = "🔴"
+                    icon = ""
                 else:
-                    icon = "🏴"
+                    icon = ""
                 lines.append(
                     f"  {icon} Day {c.day}: {c.province_name} — "
                     f"{c.old_owner_name} → {c.new_owner_name}"
@@ -357,12 +357,12 @@ class NewspaperParser:
 
         # Casualty leaderboard
         if intel.casualties:
-            lines.append("💀 CASUALTY REPORT (total losses)")
+            lines.append(" CASUALTY REPORT (total losses)")
             lines.append(f"  {'Player':<18} {'Losses':>7} {'Won':>4} {'Lost':>4} {'Cap':>4} {'Lost':>4} {'Aggr':>5}")
             lines.append(f"  {'─'*18} {'─'*7} {'─'*4} {'─'*4} {'─'*4} {'─'*4} {'─'*5}")
             for pc in sorted(intel.casualties.values(), key=lambda x: x.total_losses, reverse=True):
                 is_me = pc.player_id in self.my_ids
-                icon = "★" if is_me else " "
+                icon = "*" if is_me else " "
                 lines.append(
                     f" {icon}{pc.name:<18} {pc.total_losses:>7.0f} {pc.battles_won:>4} "
                     f"{pc.battles_lost:>4} {pc.provinces_captured:>4} "
@@ -374,13 +374,13 @@ class NewspaperParser:
         if intel.casualties:
             most_aggressive = max(intel.casualties.values(), key=lambda x: x.aggression_rating)
             most_losses = max(intel.casualties.values(), key=lambda x: x.total_losses)
-            lines.append("📋 KEY FINDINGS")
-            lines.append(f"  🗡️ Most aggressive: {most_aggressive.name} ({most_aggressive.aggression_rating:.0f}%)")
-            lines.append(f"  💀 Bleeding most: {most_losses.name} ({most_losses.total_losses:.0f} troops lost)")
+            lines.append("KEY FINDINGS")
+            lines.append(f"   Most aggressive: {most_aggressive.name} ({most_aggressive.aggression_rating:.0f}%)")
+            lines.append(f"   Bleeding most: {most_losses.name} ({most_losses.total_losses:.0f} troops lost)")
 
             dying = [pc for pc in intel.casualties.values()
                      if pc.battles_lost > pc.battles_won and pc.total_losses > 20]
             if dying:
-                lines.append(f"  🎯 Weakening targets: {', '.join(pc.name for pc in dying)}")
+                lines.append(f"  Weakening targets: {', '.join(pc.name for pc in dying)}")
 
         return "\n".join(lines)

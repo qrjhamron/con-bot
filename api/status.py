@@ -35,34 +35,28 @@ def main():
     total_units = sum(len(army_units(a)) for _, a in our_armies)
     total_hp = sum(army_hp(a) for _, a in our_armies)
     
-    print(f"╔══════════════════════════════════════════╗")
-    print(f"║  🎮 SUPREMACY WW3 — DASHBOARD           ║")
-    print(f"║  Day {day} | 4x Speed | Nigeria (P88)    ║")
-    print(f"║  VP: {vp} | Provinces: {our_provs:<3} | Next: {hrs_to_day:.0f}h ║")
-    print(f"╠══════════════════════════════════════════╣")
-    
-    # Resources
-    print(f"║  💰 Resources                            ║")
+    print(f"SUPREMACY WW3 DASHBOARD")
+    print(f"Day {day} | 4x Speed | Nigeria (P88)")
+    print(f"VP: {vp} | Provinces: {our_provs} | Next day: {hrs_to_day:.0f}h")
+    print()
+
+    print("Resources:")
     for k in ['Money', 'Supplies', 'Manpower', 'Metal', 'Oil', 'Fuel', 'Electronics']:
         r = res.get(k, {})
         a = r.get('amount', 0)
         net = r.get('production', 0) - r.get('consumption', 0)
         s = '+' if net >= 0 else ''
-        print(f"║  {k:<12}: {a:>6.0f} ({s}{net:.0f}/d)")
-    
-    # GM
+        print(f"  {k:<12}: {a:>6.0f} ({s}{net:.0f}/d)")
+
     gm = ge.get_goldmark()
-    print(f"║  💎 Goldmark: {gm}")
-    
-    print(f"╠══════════════════════════════════════════╣")
-    
-    # Armies summary
+    print(f"  Goldmark: {gm}")
+    print()
+
     atk = sum(1 for _, a in our_armies if a.get('s') in [2, 3, 6])
     idle = sum(1 for _, a in our_armies if a.get('s') == 1)
-    print(f"║  ⚔️ {len(our_armies)} armies ({total_units}u {total_hp:.0f}HP)")
-    print(f"║    {atk} attacking/moving, {idle} idle")
-    
-    # Unit type breakdown
+    print(f"Armies: {len(our_armies)} ({total_units}u {total_hp:.0f}HP)")
+    print(f"  {atk} attacking/moving, {idle} idle")
+
     unit_types = {}
     for _, a in our_armies:
         for u in army_units(a):
@@ -72,12 +66,10 @@ def main():
                     unit_types[ut] = 0
                 unit_types[ut] += 1
     for ut, cnt in sorted(unit_types.items()):
-        print(f"║    {unit_name(ut)}: {cnt}")
-    
-    print(f"╠══════════════════════════════════════════╣")
-    
-    # Production
-    print(f"║  🏭 Production")
+        print(f"  {unit_name(ut)}: {cnt}")
+    print()
+
+    print("Production:")
     cities = [l for l in locs if isinstance(l, dict) and l.get('o') == 88 and l.get('plv', 0) >= 4]
     for city in sorted(cities, key=lambda x: x.get('id', 0)):
         pid = city.get('id', 0)
@@ -87,20 +79,17 @@ def main():
             ut = su.get('unit', {}).get('t', su.get('t', 0))
             comp = pi.get('t', 0)
             rem = (comp - now_ms) / 3600000
-            print(f"║    P{pid}: ⏳ {unit_name(ut)} ({rem:.1f}h)")
+            print(f"  P{pid}: {unit_name(ut)} ({rem:.1f}h)")
         else:
-            print(f"║    P{pid}: 💤 idle")
-    
-    print(f"╠══════════════════════════════════════════╣")
-    
-    # Wars — check neighborRelations + armies in enemy territory
+            print(f"  P{pid}: idle")
+    print()
+
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
     our_rels = nr.get('88', nr.get(88, {}))
     war_pids = set()
     for pk, rel in our_rels.items():
         if isinstance(rel, (int, float)) and rel == -2:
             war_pids.add(int(pk))
-    # Detect wars from armies attacking/in enemy territory
     for _, a in our_armies:
         cmds = a.get('cmds', [])
         if isinstance(cmds, list) and len(cmds) > 1:
@@ -111,16 +100,14 @@ def main():
                         for l in locs:
                             if isinstance(l, dict) and l.get('id') == tp and l.get('o') and l.get('o') != 88:
                                 war_pids.add(l.get('o'))
-    
-    print(f"║  🔥 Wars")
+
+    print("Wars:")
     if not war_pids:
-        print(f"║    None")
+        print("  None")
     for pid in sorted(war_pids):
         nation = players.get(pid, {}).get('nationName', f'P{pid}')
         ep = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == pid)
-        print(f"║    vs {nation} ({ep} provs)")
-    
-    print(f"╚══════════════════════════════════════════╝")
+        print(f"  vs {nation} ({ep} provs)")
 
 if __name__ == '__main__':
     main()

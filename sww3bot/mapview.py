@@ -63,7 +63,7 @@ class MapAnalyzer:
     # Player display symbols for ASCII map
     SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     EMPTY = "·"
-    CONFLICT = "⚔"
+    CONFLICT = "WAR"
 
     def __init__(self, game_state: GameState, my_player_ids: Optional[set] = None):
         self.state = game_state
@@ -74,16 +74,15 @@ class MapAnalyzer:
     def _assign_symbols(self):
         """Assign display symbols to players."""
         idx = 0
-        # My player gets ★
+        # My player gets *
         for pid in self.my_ids:
-            self._player_symbols[pid] = "★"
+            self._player_symbols[pid] = "*"
 
         for pid in sorted(self.state.players.keys()):
             if pid not in self._player_symbols:
                 self._player_symbols[pid] = self.SYMBOLS[idx % len(self.SYMBOLS)]
                 idx += 1
 
-    # ── Territory Overview ───────────────────────────
 
     def territory_summary(self) -> str:
         """Show territory control per player."""
@@ -92,7 +91,7 @@ class MapAnalyzer:
             player_provs.setdefault(prov.owner_id, []).append(prov)
 
         lines = [
-            "🗺️  TERRITORY CONTROL",
+            " TERRITORY CONTROL",
             "=" * 60,
             "",
             f"{'Sym':<4} {'Player':<18} {'Provs':>5} {'Troops':>7} {'Avg Morale':>10} {'Status'}",
@@ -112,7 +111,7 @@ class MapAnalyzer:
 
             is_me = pid in self.my_ids
             marker = " ◄ YOU" if is_me else ""
-            status_icon = "🟢" if avg_morale > 60 else ("🟡" if avg_morale > 34 else "🔴")
+            status_icon = "" if avg_morale > 60 else ("" if avg_morale > 34 else "")
 
             # Territory bar
             bar_len = max(1, int(pct / 5))
@@ -128,7 +127,6 @@ class MapAnalyzer:
 
         return "\n".join(lines)
 
-    # ── ASCII Map ────────────────────────────────────
 
     def render_map(self, width: int = 40, height: int = 15) -> str:
         """
@@ -167,7 +165,7 @@ class MapAnalyzer:
 
         # Render
         lines = [
-            "🗺️  MAP VIEW",
+            " MAP VIEW",
             "┌" + "─" * width + "┐",
         ]
         for row in grid:
@@ -187,7 +185,6 @@ class MapAnalyzer:
 
         return "\n".join(lines)
 
-    # ── Frontline Detection ──────────────────────────
 
     def detect_frontlines(self) -> list[FrontLine]:
         """
@@ -233,7 +230,7 @@ class MapAnalyzer:
         """Report on all active frontlines."""
         frontlines = self.detect_frontlines()
         lines = [
-            "⚔️  FRONTLINE ANALYSIS",
+            " FRONTLINE ANALYSIS",
             "=" * 60,
             "",
         ]
@@ -249,12 +246,12 @@ class MapAnalyzer:
             name_b = pb.name if pb else f"P{fl.player_b}"
 
             is_my_front = fl.player_a in self.my_ids or fl.player_b in self.my_ids
-            front_icon = "🔥" if is_my_front else "⚔️"
+            front_icon = "" if is_my_front else ""
 
             balance_icon = {
-                "a_dominant": f"💪 {name_a}",
-                "b_dominant": f"💪 {name_b}",
-                "balanced": "⚖️ Even",
+                "a_dominant": f" {name_a}",
+                "b_dominant": f" {name_b}",
+                "balanced": " Even",
             }
 
             lines.append(
@@ -269,12 +266,11 @@ class MapAnalyzer:
             if is_my_front and fl.balance in ("a_dominant", "b_dominant"):
                 dominant = fl.player_a if fl.balance == "a_dominant" else fl.player_b
                 if dominant not in self.my_ids:
-                    lines.append(f"   ⚠️ ENEMY HAS ADVANTAGE — reinforce this front!")
+                    lines.append(f"   ENEMY HAS ADVANTAGE — reinforce this front!")
             lines.append("")
 
         return "\n".join(lines)
 
-    # ── Weak Spot Detection ──────────────────────────
 
     def find_weak_spots(self) -> list[WeakSpot]:
         """
@@ -304,10 +300,10 @@ class MapAnalyzer:
                 )
 
                 if is_mine:
-                    ws.reason = f"🚨 YOUR province {prov.name} is UNDEFENDED! " \
+                    ws.reason = f"YOUR province {prov.name} is UNDEFENDED! " \
                                f"Enemy has {enemy_strength:.0f} troops nearby"
                 else:
-                    ws.reason = f"🎯 Enemy province {prov.name} is UNDEFENDED — " \
+                    ws.reason = f"Enemy province {prov.name} is UNDEFENDED — " \
                                f"easy capture! (garrison: {prov.garrison_strength:.0f})"
 
                 weak.append(ws)
@@ -318,7 +314,7 @@ class MapAnalyzer:
         """Report on vulnerable provinces."""
         spots = self.find_weak_spots()
         lines = [
-            "🎯 WEAK SPOT ANALYSIS",
+            "WEAK SPOT ANALYSIS",
             "=" * 60,
             "",
         ]
@@ -327,13 +323,13 @@ class MapAnalyzer:
         enemy_weak = [s for s in spots if s.province.owner_id not in self.my_ids]
 
         if my_weak:
-            lines.append("🚨 YOUR VULNERABLE PROVINCES (defend these!)")
+            lines.append("YOUR VULNERABLE PROVINCES (defend these!)")
             for ws in my_weak[:5]:
                 lines.append(f"  {ws.reason}")
             lines.append("")
 
         if enemy_weak:
-            lines.append("🎯 ENEMY WEAK SPOTS (attack opportunities!)")
+            lines.append("ENEMY WEAK SPOTS (attack opportunities!)")
             for ws in enemy_weak[:5]:
                 lines.append(f"  {ws.reason}")
             lines.append("")
@@ -343,7 +339,6 @@ class MapAnalyzer:
 
         return "\n".join(lines)
 
-    # ── Full Map Report ──────────────────────────────
 
     def full_report(self) -> str:
         """Complete map analysis."""

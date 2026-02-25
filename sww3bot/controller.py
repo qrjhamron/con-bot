@@ -21,7 +21,6 @@ from typing import Optional, List, Dict, Tuple
 logger = logging.getLogger(__name__)
 
 
-# ── Jackson wrapper helpers ──────────────────────────────────
 def _linked_list(items):
     return ["java.util.LinkedList", items]
 
@@ -41,7 +40,6 @@ def _hash_map(d=None):
     return m
 
 
-# ── Relation types ───────────────────────────────────────────
 RELATION_PEACE = 0
 RELATION_RIGHT_OF_WAY = 1
 RELATION_SHARED_MAP = 2
@@ -61,7 +59,6 @@ class GameController:
         self._state_cache = None
         self._sub_action_id = 0
 
-    # ── State refresh ────────────────────────────────────────
     def refresh_state(self) -> dict:
         self._state_cache = self.client.all_data()
         return self._state_cache
@@ -97,7 +94,6 @@ class GameController:
             raise
         return resp.json()
 
-    # ── Helper: get province coordinates ─────────────────────
     def _get_province_coords(self, province_id: int) -> Optional[dict]:
         """Get {x, y} coords for a province from cached state."""
         s3 = self.state.get('states', {}).get('3', {})
@@ -114,7 +110,6 @@ class GameController:
         armies = s6.get('armies', {})
         return armies.get(str(army_id))
 
-    # ── Army Commands ────────────────────────────────────────
     def move_army(self, army_id: int, target_province: int) -> dict:
         """Move an army to a target province.
 
@@ -268,7 +263,6 @@ class GameController:
         logger.info("Attack province %d with army %d", target_province, army_id)
         return result
 
-    # ── Build / Production ───────────────────────────────────
     def build_building(self, province_id: int, building_id: int,
                        template: Optional[dict] = None) -> dict:
         """Build a building in a province using UltUpdateProvinceAction mode=1.
@@ -384,7 +378,6 @@ class GameController:
         }
         return self._send_sub_action(sub_action)
 
-    # ── Research ─────────────────────────────────────────────
     def research(self, research_id: int) -> dict:
         """Start a research."""
         sub_action = {
@@ -405,7 +398,6 @@ class GameController:
         }
         return self._send_sub_action(sub_action)
 
-    # ── Diplomacy ────────────────────────────────────────────
     def change_relation(self, target_player: int, relation: int) -> dict:
         """Change diplomatic relation with another player.
 
@@ -441,7 +433,6 @@ class GameController:
     def offer_shared_intel(self, target_player: int) -> dict:
         return self.change_relation(target_player, RELATION_SHARED_INTEL)
 
-    # ── Market Orders ────────────────────────────────────────
     def place_order(self, resource_type: int, amount: int,
                     limit_price: float, buy: bool = True) -> dict:
         """Place a market buy/sell order."""
@@ -470,7 +461,6 @@ class GameController:
     def sell_resource(self, resource_type: int, amount: int, min_price: float) -> dict:
         return self.place_order(resource_type, amount, min_price, buy=False)
 
-    # ── Spy Operations ───────────────────────────────────────
     def recruit_spy(self) -> dict:
         """Recruit a new spy."""
         sub_action = {
@@ -491,12 +481,10 @@ class GameController:
         }
         return self._send_sub_action(sub_action)
 
-    # ── Province Upgrade ─────────────────────────────────────
     def upgrade_province(self, province_id: int, upgrade_id: int) -> dict:
         """Build/upgrade a building in a province (uses proven mode=1 method)."""
         return self.build_building(province_id, upgrade_id)
 
-    # ── Template & Result Helpers ────────────────────────────
     def _get_building_template(self, province_id: int, building_id: int) -> Optional[dict]:
         """Get mu template from queueableUpgrades for a province."""
         s3 = self.state.get('states', {}).get('3', {})
@@ -594,7 +582,6 @@ class GameController:
             cities.append(city)
         return cities
 
-    # ── Intel Dashboard ──────────────────────────────────────
     def get_full_intel(self) -> dict:
         """Get comprehensive game intelligence from current state."""
         self.refresh_state()
@@ -703,11 +690,11 @@ class GameController:
         intel = self.get_full_intel()
         lines = []
         lines.append("=" * 60)
-        lines.append(f"🎮 GAME DASHBOARD — Day {intel['game']['day']}")
+        lines.append(f"GAME DASHBOARD — Day {intel['game']['day']}")
         lines.append("=" * 60)
 
         # Resources
-        lines.append("\n💰 RESOURCES:")
+        lines.append("\n RESOURCES:")
         for name, data in sorted(intel['resources'].items(),
                                   key=lambda x: x[1]['id']):
             if data['id'] == 0:
@@ -721,7 +708,7 @@ class GameController:
                         f"  (prod={prod:,.0f} cons={cons:,.0f})")
 
         # Armies
-        lines.append(f"\n🎖️ OUR ARMIES ({len(intel['our_armies'])}):")
+        lines.append(f"\n OUR ARMIES ({len(intel['our_armies'])}):")
         for a in intel['our_armies']:
             status_map = {1: "IDLE", 2: "MOVING", 3: "GARRISON"}
             s = status_map.get(a['status'], f"s={a['status']}")
@@ -733,15 +720,15 @@ class GameController:
                         f"[{unit_str}]")
 
         if intel['enemy_armies']:
-            lines.append(f"\n⚔️ ENEMY ARMIES VISIBLE ({len(intel['enemy_armies'])}):")
+            lines.append(f"\nENEMY ARMIES VISIBLE ({len(intel['enemy_armies'])}):")
             for a in intel['enemy_armies']:
                 lines.append(f"  #{a['id']}: P{a['owner']} loc={a['location']} "
                             f"HP={a['hp']:.0f}/{a['max_hp']:.0f}")
 
         # Wars
         if intel['wars']:
-            lines.append(f"\n🔥 AT WAR WITH: {', '.join(f'P{w}' for w in intel['wars'])}")
+            lines.append(f"\n AT WAR WITH: {', '.join(f'P{w}' for w in intel['wars'])}")
         if intel['allies']:
-            lines.append(f"\n🤝 ALLIES: {', '.join(f'P{a[0]}(rel={a[1]})' for a in intel['allies'])}")
+            lines.append(f"\nALLIES: {', '.join(f'P{a[0]}(rel={a[1]})' for a in intel['allies'])}")
 
         return "\n".join(lines)

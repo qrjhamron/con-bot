@@ -47,9 +47,9 @@ def main():
         total_units = sum(len(army_units(a)) for _, a in army_list)
         total_hp = sum(army_hp(a) for _, a in army_list)
         
-        print(f"\n{'═'*60}")
+        print(f"\n{'='*60}")
         print(f"  {nation} (P{owner}): {len(army_list)} armies, {total_units} units, {total_hp:.0f} HP")
-        print(f"{'═'*60}")
+        print(f"{'='*60}")
         
         for aid, a in sorted(army_list, key=lambda x: -army_hp(x[1])):
             units = army_units(a)

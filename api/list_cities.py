@@ -17,27 +17,27 @@ def main():
     
     cities.sort(key=lambda x: -x.get('plv', 0))
     
-    print(f"🏙️ Cities: {len(cities)}")
+    print(f"Cities: {len(cities)}")
     
     for city in cities:
         pid = city.get('id', 0)
         plv = city.get('plv', 0)
         morale = city.get('m', 0)
         
-        print(f"\n{'═'*50}")
+        print(f"\n{'='*50}")
         print(f"  P{pid} | Level {plv} | Morale {morale}%")
-        print(f"{'═'*50}")
+        print(f"{'='*50}")
         
         # Buildings
         us = city.get('us', ['', []])
         upgrades = us[1] if isinstance(us, list) and len(us) > 1 else []
-        print("  📦 Buildings:")
+        print("   Buildings:")
         for u in upgrades:
             if isinstance(u, dict):
                 uid = u.get('id', 0)
                 built = u.get('built', True)
                 enabled = u.get('e', False)
-                status = '✅' if built is not False else '🔨building'
+                status = 'OK' if built is not False else '[BUILD]building'
                 print(f"    {building_name(uid)} [{status}]")
         
         # Construction
@@ -50,7 +50,7 @@ def main():
                     comp = slot.get('t', 0)
                     rem = (comp - now_ms) / 3600000
                     if not has_construction:
-                        print("  🏗️ Construction:")
+                        print("  [CONST] Construction:")
                         has_construction = True
                     print(f"    Slot {i}: {building_name(su.get('id', 0))} ({rem:.1f}h remaining)")
         
@@ -61,9 +61,9 @@ def main():
             ut = su.get('unit', {}).get('t', su.get('t', 0))
             comp = pi.get('t', 0)
             rem = (comp - now_ms) / 3600000
-            print(f"  🏭 Production: {unit_name(ut)} ({rem:.1f}h remaining)")
+            print(f"  [PROD] Production: {unit_name(ut)} ({rem:.1f}h remaining)")
         else:
-            print("  🏭 Production: IDLE")
+            print("  [PROD] Production: IDLE")
         
         # Available productions
         pcid = props.get(str(pid), {})
@@ -71,7 +71,7 @@ def main():
         qp_items = qp[1] if isinstance(qp, list) and len(qp) > 1 else []
         if qp_items:
             avail = [unit_name(i.get('unit', {}).get('t', 0)) for i in qp_items if isinstance(i, dict)]
-            print(f"  📋 Can produce: {', '.join(avail)}")
+            print(f"  Can produce: {', '.join(avail)}")
 
 if __name__ == '__main__':
     main()

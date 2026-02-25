@@ -126,7 +126,6 @@ class MarketBot:
         """Day 10-12 is the crash window when bots dump resources."""
         return 10 <= day <= 12
 
-    # ── Market Signals ───────────────────────────────
 
     def generate_signals(self) -> list[MarketSignal]:
         """Generate buy/sell signals based on predicted price curves."""
@@ -145,7 +144,6 @@ class MarketBot:
                 price=current_predicted,
             )
 
-            # ── EXPLOIT: Day 10 crash prediction ──
             if day <= 9 and self._is_crash_window(day + (10 - day)):
                 crash_price = self._predict_price(resource, 10)
                 days_until_crash = 10 - day
@@ -156,7 +154,7 @@ class MarketBot:
                     signal.target_price = crash_price
                     signal.profit_potential = (current_predicted - crash_price) / current_predicted * 100
                     signal.reason = (
-                        f"🔮 CRASH in {days_until_crash} days! Price will drop "
+                        f" CRASH in {days_until_crash} days! Price will drop "
                         f"{current_predicted:.0f} → {crash_price:.0f} "
                         f"(-{signal.profit_potential:.0f}%). WAIT AND BUY THEN!"
                     )
@@ -164,7 +162,7 @@ class MarketBot:
                     signal.action = "HOLD"
                     signal.urgency = "soon"
                     signal.reason = (
-                        f"📉 Market crash coming in ~{days_until_crash} days. "
+                        f" Market crash coming in ~{days_until_crash} days. "
                         f"Don't buy {resource} at {current_predicted:.0f}, "
                         f"will be {crash_price:.0f} soon."
                     )
@@ -173,25 +171,23 @@ class MarketBot:
                     signal.urgency = "optional"
                     signal.reason = f"Prices stable. Crash expected around day 10."
 
-            # ── During crash — BUY EVERYTHING ──
             elif self._is_crash_window(day):
                 signal.action = "BUY"
                 signal.urgency = "now"
                 normal_price = self._predict_price(resource, day + 5)
                 signal.profit_potential = (normal_price - current_predicted) / current_predicted * 100
                 signal.reason = (
-                    f"🚨 MARKET CRASH ACTIVE! {resource} at {current_predicted:.0f} "
+                    f"MARKET CRASH ACTIVE! {resource} at {current_predicted:.0f} "
                     f"(normally {normal_price:.0f}). BUY NOW! "
                     f"+{signal.profit_potential:.0f}% profit when prices recover."
                 )
 
-            # ── Post-crash recovery ──
             elif 13 <= day <= 15:
                 if current_amount > 5000:
                     signal.action = "SELL"
                     signal.urgency = "soon"
                     signal.reason = (
-                        f"📈 Prices recovering. Good time to sell excess {resource} "
+                        f" Prices recovering. Good time to sell excess {resource} "
                         f"at {current_predicted:.0f}."
                     )
                 else:
@@ -199,7 +195,6 @@ class MarketBot:
                     signal.urgency = "optional"
                     signal.reason = f"Prices recovering to {current_predicted:.0f}."
 
-            # ── Normal market ──
             else:
                 if current_amount < 500 and resource in ("oil", "food"):
                     signal.action = "BUY"
@@ -226,7 +221,6 @@ class MarketBot:
 
         return signals
 
-    # ── Arbitrage Detection ──────────────────────────
 
     def detect_arbitrage(self) -> list[str]:
         """
@@ -244,7 +238,7 @@ class MarketBot:
             if future > current * 1.2:
                 profit = (future - current) / current * 100
                 opportunities.append(
-                    f"💰 {resource}: Buy at {current:.0f}, sell in 3 days at ~{future:.0f} "
+                    f" {resource}: Buy at {current:.0f}, sell in 3 days at ~{future:.0f} "
                     f"(+{profit:.0f}% profit)"
                 )
 
@@ -255,13 +249,12 @@ class MarketBot:
                 other_price = self._predict_price(other_res, day)
                 if current > other_price * 2:
                     opportunities.append(
-                        f"🔄 Sell {resource} ({current:.0f}) → Buy {other_res} ({other_price:.0f}) "
+                        f"Sell {resource} ({current:.0f}) → Buy {other_res} ({other_price:.0f}) "
                         f"— {resource} is overpriced"
                     )
 
         return opportunities[:5]  # Top 5
 
-    # ── Optimal Buy Timing ───────────────────────────
 
     def optimal_buy_timing(self) -> dict[str, dict]:
         """Calculate the best day to buy each resource."""
@@ -289,24 +282,23 @@ class MarketBot:
 
         return timings
 
-    # ── Render ───────────────────────────────────────
 
     def render(self) -> str:
         """Full market analysis report."""
         day = self.state.day
         lines = [
-            f"💹 MARKET ANALYSIS — Day {day}",
+            f"MARKET ANALYSIS — Day {day}",
             "=" * 60,
         ]
 
         if self._is_crash_window(day):
-            lines.append("🚨🚨🚨 MARKET CRASH ACTIVE — BUY EVERYTHING!!! 🚨🚨🚨")
+            lines.append("MARKET CRASH ACTIVE — BUY EVERYTHING!!! ")
         elif day <= 9 and (10 - day) <= 3:
-            lines.append(f"⏰ CRASH WARNING: {10 - day} days until market crash!")
+            lines.append(f"CRASH WARNING: {10 - day} days until market crash!")
         lines.append("")
 
         # Price table
-        lines.append("📊 PRICE PREDICTIONS (4x speed)")
+        lines.append("PRICE PREDICTIONS (4x speed)")
         lines.append(f"{'Resource':<12} {'Now':>6} {'Day+3':>6} {'Day+7':>6} {'Day 10':>7} {'Trend'}")
         lines.append(f"{'─'*12} {'─'*6} {'─'*6} {'─'*6} {'─'*7} {'─'*8}")
 
@@ -317,11 +309,11 @@ class MarketBot:
             d10 = self._predict_price(resource, 10)
 
             if d3 > now * 1.1:
-                trend = "📈 up"
+                trend = " up"
             elif d3 < now * 0.9:
-                trend = "📉 DOWN"
+                trend = " DOWN"
             else:
-                trend = "➡️ flat"
+                trend = "> flat"
 
             lines.append(
                 f"{resource:<12} {now:>6.0f} {d3:>6.0f} {d7:>6.0f} {d10:>7.0f} {trend}"
@@ -330,12 +322,12 @@ class MarketBot:
         # Signals
         lines.append("")
         signals = self.generate_signals()
-        lines.append("📡 TRADING SIGNALS")
+        lines.append("TRADING SIGNALS")
         for sig in signals:
-            action_icon = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡", "WAIT": "⏳"}
-            urg_icon = {"now": "❗", "soon": "⏰", "optional": "💤"}
+            action_icon = {"BUY": "", "SELL": "", "HOLD": "", "WAIT": ""}
+            urg_icon = {"now": "!", "soon": "", "optional": ""}
             lines.append(
-                f"  {action_icon.get(sig.action, '⚪')} {sig.action:>4} {sig.resource:<12} "
+                f"  {action_icon.get(sig.action, '-')} {sig.action:>4} {sig.resource:<12} "
                 f"{urg_icon.get(sig.urgency, '')} {sig.reason}"
             )
 
@@ -344,10 +336,10 @@ class MarketBot:
         timings = self.optimal_buy_timing()
         best_deals = {k: v for k, v in timings.items() if v["savings_pct"] > 10}
         if best_deals:
-            lines.append("⏰ OPTIMAL BUY TIMING")
+            lines.append("OPTIMAL BUY TIMING")
             for res, t in sorted(best_deals.items(), key=lambda x: x[1]["savings_pct"], reverse=True):
                 lines.append(
-                    f"  💰 {res}: wait {t['wait_days']} days → buy at day {t['best_day']} "
+                    f"   {res}: wait {t['wait_days']} days → buy at day {t['best_day']} "
                     f"(save {t['savings_pct']:.0f}%: {t['current_price']:.0f} → {t['best_price']:.0f})"
                 )
 
@@ -355,7 +347,7 @@ class MarketBot:
         arb = self.detect_arbitrage()
         if arb:
             lines.append("")
-            lines.append("🔄 ARBITRAGE OPPORTUNITIES")
+            lines.append("ARBITRAGE OPPORTUNITIES")
             for a in arb:
                 lines.append(f"  {a}")
 

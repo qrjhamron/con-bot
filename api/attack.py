@@ -39,12 +39,12 @@ def main():
         army_id = best_id
     
     if not army_id:
-        print("❌ No army available")
+        print("No army available")
         return
     
     result = ctrl.move_army(army_id, args.target)
     ar = ctrl._extract_action_result(result)
-    print(f"{'✅' if ar==1 else '❌'} Army #{army_id} → P{args.target} (ar={ar})")
+    print(f"{'OK' if ar==1 else 'FAIL'} Army #{army_id} → P{args.target} (ar={ar})")
 
 if __name__ == '__main__':
     main()

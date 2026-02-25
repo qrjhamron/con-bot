@@ -91,7 +91,6 @@ class SpyMaster:
         self._movements: list[TroopMovement] = []
         self._warnings: list[AttackWarning] = []
 
-    # ── EXPLOIT 1: See all enemy troops ──────────────
 
     def scan_enemy_troops(self) -> dict[int, PlayerIntel]:
         """
@@ -140,7 +139,6 @@ class SpyMaster:
 
         return intel_map
 
-    # ── EXPLOIT 2: Detect troop movements ────────────
 
     def detect_movements(self) -> list[TroopMovement]:
         """
@@ -227,7 +225,6 @@ class SpyMaster:
                 return True
         return False
 
-    # ── EXPLOIT 3: Attack early warning ──────────────
 
     def get_attack_warnings(self) -> list[AttackWarning]:
         """
@@ -278,7 +275,6 @@ class SpyMaster:
         self._warnings = warnings
         return warnings
 
-    # ── EXPLOIT 4: Building intelligence ─────────────
 
     def enemy_tech_report(self) -> list[dict]:
         """
@@ -302,30 +298,29 @@ class SpyMaster:
 
             if pi.factories_detected > 0:
                 tech["can_produce"].append("advanced_units")
-                tech["threat_notes"].append(f"⚠️ Has {pi.factories_detected} factories — can produce tanks/arty")
+                tech["threat_notes"].append(f"Has {pi.factories_detected} factories — can produce tanks/arty")
             if pi.airfields_detected > 0:
                 tech["can_produce"].append("aircraft")
-                tech["threat_notes"].append(f"✈️ Has {pi.airfields_detected} airfields — has air units")
+                tech["threat_notes"].append(f" Has {pi.airfields_detected} airfields — has air units")
             if pi.naval_bases_detected > 0:
                 tech["can_produce"].append("warships")
-                tech["threat_notes"].append(f"🚢 Has {pi.naval_bases_detected} naval bases")
+                tech["threat_notes"].append(f" Has {pi.naval_bases_detected} naval bases")
             if pi.army_bases_detected > 0:
                 tech["can_produce"].append("elite_ground")
-                tech["threat_notes"].append(f"🏗️ Has {pi.army_bases_detected} army bases — elite units!")
+                tech["threat_notes"].append(f"[CONST] Has {pi.army_bases_detected} army bases — elite units!")
 
             if not tech["can_produce"]:
-                tech["threat_notes"].append("💤 No advanced buildings detected — early game tech")
+                tech["threat_notes"].append("No advanced buildings detected — early game tech")
 
             reports.append(tech)
 
         return sorted(reports, key=lambda r: len(r["can_produce"]), reverse=True)
 
-    # ── Render ───────────────────────────────────────
 
     def full_report(self) -> str:
         """Full intelligence report."""
         lines = [
-            "🕵️ INTELLIGENCE REPORT",
+            "INTELLIGENCE REPORT",
             "=" * 60,
             "",
         ]
@@ -333,11 +328,11 @@ class SpyMaster:
         # Enemy troop summary
         intel = self.scan_enemy_troops()
         if intel:
-            lines.append("📡 ENEMY TROOP POSITIONS (API data leak)")
+            lines.append("ENEMY TROOP POSITIONS (API data leak)")
             lines.append(f"{'Player':<18} {'Troops':>7} {'Provs':>6} {'Strongest':>10} {'Factories':>9}")
             lines.append(f"{'─'*18} {'─'*7} {'─'*6} {'─'*10} {'─'*9}")
             for pid, pi in sorted(intel.items(), key=lambda x: x[1].total_troops, reverse=True):
-                status = "🟢" if pi.is_active else "💀"
+                status = "" if pi.is_active else ""
                 lines.append(
                     f"{status} {pi.name:<15} {pi.total_troops:>7.0f} {pi.num_provinces:>6} "
                     f"{pi.strongest_garrison:>10.0f} {pi.factories_detected:>9}"
@@ -347,25 +342,25 @@ class SpyMaster:
         # Movement detection
         movements = self.detect_movements()
         if movements:
-            lines.append("🔄 TROOP MOVEMENTS DETECTED")
+            lines.append("TROOP MOVEMENTS DETECTED")
             for mv in movements:
-                icon = {"critical": "🚨", "high": "🔴", "medium": "🟡", "low": "🟢"}
+                icon = {"critical": "", "high": "", "medium": "", "low": ""}
                 lines.append(
-                    f"  {icon.get(mv.threat_level, '⚪')} {mv.player_name}: "
+                    f"  {icon.get(mv.threat_level, '-')} {mv.player_name}: "
                     f"{mv.from_province_name or '?'} → {mv.to_province_name or '?'} "
                     f"({mv.strength_delta:.0f} troops)"
-                    f"{' ⚠️ TOWARD YOU!' if mv.is_toward_me else ''}"
+                    f"{' TOWARD YOU!' if mv.is_toward_me else ''}"
                 )
             lines.append("")
 
         # Attack warnings
         warnings = self.get_attack_warnings()
         if warnings:
-            lines.append("🚨 ATTACK WARNINGS")
+            lines.append("ATTACK WARNINGS")
             for w in warnings:
-                icon = {"critical": "🔴🔴", "high": "🔴", "medium": "🟡", "low": "🟢"}
+                icon = {"critical": "", "high": "", "medium": "", "low": ""}
                 lines.append(
-                    f"  {icon.get(w.urgency, '⚪')} {w.attacker_name} → {w.target_province_name}: "
+                    f"  {icon.get(w.urgency, '-')} {w.attacker_name} → {w.target_province_name}: "
                     f"{w.reason}"
                 )
             lines.append("")
@@ -373,7 +368,7 @@ class SpyMaster:
         # Tech intelligence
         tech = self.enemy_tech_report()
         if tech:
-            lines.append("🔬 ENEMY TECH INTELLIGENCE (building spy)")
+            lines.append(" ENEMY TECH INTELLIGENCE (building spy)")
             for t in tech:
                 lines.append(f"  {t['player']} ({t['country']}):")
                 for note in t["threat_notes"]:

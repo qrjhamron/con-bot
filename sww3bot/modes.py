@@ -49,13 +49,11 @@ class ModeProfile:
             self.priority_units = []
 
 
-# ══════════════════════════════════════════════════
 # Predefined Mode Profiles
-# ══════════════════════════════════════════════════
 
 MODES = {
     GameMode.AGGRESSIVE: ModeProfile(
-        name="⚔️  Aggressive",
+        name=" Aggressive",
         mode=GameMode.AGGRESSIVE,
         military_weight=2.0,
         economy_weight=0.8,
@@ -71,7 +69,7 @@ MODES = {
         priority_units=["tank", "mobile_artillery", "strike_fighter", "motorized_infantry"],
     ),
     GameMode.DEFENSIVE: ModeProfile(
-        name="🛡️  Defensive",
+        name="  Defensive",
         mode=GameMode.DEFENSIVE,
         military_weight=0.8,
         economy_weight=1.2,
@@ -87,7 +85,7 @@ MODES = {
         priority_units=["sam", "towed_artillery", "national_guard", "maa"],
     ),
     GameMode.ECONOMIC: ModeProfile(
-        name="💰 Economic",
+        name=" Economic",
         mode=GameMode.ECONOMIC,
         military_weight=0.5,
         economy_weight=2.0,
@@ -104,7 +102,7 @@ MODES = {
         priority_units=["cavalry", "armored_car"],  # Cheap units only
     ),
     GameMode.BALANCED: ModeProfile(
-        name="⚖️  Balanced",
+        name="  Balanced",
         mode=GameMode.BALANCED,
         military_weight=1.0,
         economy_weight=1.0,
@@ -119,7 +117,7 @@ MODES = {
         priority_units=["armored_car", "cavalry", "towed_artillery"],
     ),
     GameMode.RUSH: ModeProfile(
-        name="🏃 Rush",
+        name=" Rush",
         mode=GameMode.RUSH,
         military_weight=2.5,
         economy_weight=0.5,
@@ -136,7 +134,7 @@ MODES = {
         priority_units=["cavalry", "armored_car", "motorized_infantry"],
     ),
     GameMode.TURTLE: ModeProfile(
-        name="🐢 Turtle",
+        name=" Turtle",
         mode=GameMode.TURTLE,
         military_weight=0.3,
         economy_weight=1.5,
@@ -171,7 +169,7 @@ def get_mode_by_name(name: str) -> Optional[ModeProfile]:
 
 def mode_selector_text() -> str:
     """Display all modes for user selection."""
-    lines = ["🎮 SELECT GAME MODE", "=" * 40, ""]
+    lines = ["SELECT GAME MODE", "=" * 40, ""]
     for i, (mode_enum, profile) in enumerate(MODES.items(), 1):
         lines.append(f"  {i}. {profile.name}")
         lines.append(f"     {profile.description}")

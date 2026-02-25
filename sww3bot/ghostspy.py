@@ -211,10 +211,10 @@ class GhostSpy:
     def render_session(self, session: GhostSession) -> str:
         """Render ghost spy session info."""
         lines = [
-            f"👻 GHOST SPY — Game #{session.game_id}",
+            f" GHOST SPY — Game #{session.game_id}",
             "=" * 55,
             f"  Server:  {session.game_server}",
-            f"  Status:  {'🟢 ACTIVE' if session.is_active else '🔴 FAILED'}",
+            f"  Status:  {' ACTIVE' if session.is_active else ' FAILED'}",
             f"  Players: {len(session.players_found)}",
             "",
         ]
@@ -223,7 +223,7 @@ class GhostSpy:
             lines.append(f"  {'Player':<20} {'Nation':<12} {'Prov':>5} {'Army':>6}")
             lines.append(f"  {'─'*20} {'─'*12} {'─'*5} {'─'*6}")
             for p in sorted(session.players_found, key=lambda x: x.get("army_strength", 0), reverse=True):
-                tracked = "🎯" if p.get("id") in session.target_player_ids else "  "
+                tracked = "" if p.get("id") in session.target_player_ids else "  "
                 lines.append(
                     f" {tracked}{p.get('name', '?'):<20} {p.get('nation', '?'):<12} "
                     f"{p.get('provinces', 0):>5} {p.get('army_strength', 0):>6}"
@@ -234,7 +234,7 @@ class GhostSpy:
     def render_cross_game_intel(self, intel: CrossGameIntel) -> str:
         """Render cross-game intelligence profile."""
         lines = [
-            f"🎯 CROSS-GAME INTEL: {intel.username}",
+            f"CROSS-GAME INTEL: {intel.username}",
             "=" * 55,
             f"  User ID:            {intel.user_id}",
             f"  Games observed:     {intel.games_observed}",
@@ -245,28 +245,28 @@ class GhostSpy:
         ]
 
         if intel.common_units:
-            lines.append("  🔫 Common Units:")
+            lines.append("   Common Units:")
             for u in intel.common_units:
                 lines.append(f"    • {u}")
             lines.append("")
 
         if intel.alliance_partners:
-            lines.append("  🤝 Known Alliance Partners:")
+            lines.append("  Known Alliance Partners:")
             for p in intel.alliance_partners:
                 lines.append(f"    • {p}")
             lines.append("")
 
         if intel.weaknesses_detected:
-            lines.append("  ⚠️ DETECTED WEAKNESSES:")
+            lines.append("  DETECTED WEAKNESSES:")
             for w in intel.weaknesses_detected:
-                lines.append(f"    🎯 {w}")
+                lines.append(f"    {w}")
 
         return "\n".join(lines)
 
     def render_all(self) -> str:
         """Render summary of all ghost spy sessions."""
         lines = [
-            "👻 GHOST SPY NETWORK",
+            " GHOST SPY NETWORK",
             "=" * 55,
             f"  Active sessions: {sum(1 for s in self.sessions.values() if s.is_active)}",
             f"  Tracked players: {len(self._target_players)}",
@@ -274,7 +274,7 @@ class GhostSpy:
         ]
 
         for gid, session in self.sessions.items():
-            status = "🟢" if session.is_active else "🔴"
+            status = "" if session.is_active else ""
             lines.append(f"  {status} Game #{gid}: {len(session.players_found)} players, "
                         f"server: {session.game_server}")
 

@@ -69,9 +69,7 @@ class Country:
         return "balanced"
 
 
-# ══════════════════════════════════════════════════
 # World Map Countries (22 players)
-# ══════════════════════════════════════════════════
 
 WORLD_MAP = {
     "USA": Country(
@@ -275,9 +273,7 @@ WORLD_MAP = {
 }
 
 
-# ══════════════════════════════════════════════════
 # Lookup helpers
-# ══════════════════════════════════════════════════
 
 def get_country(name: str, map_type: MapType = MapType.WORLD) -> Optional[Country]:
     """Lookup country by name (case-insensitive, partial match)."""
@@ -298,28 +294,28 @@ def list_countries(map_type: MapType = MapType.WORLD) -> list[Country]:
 def country_summary(country: Country) -> str:
     """Pretty-print a country summary."""
     lines = [
-        f"🏳️  {country.name} ({country.code})",
+        f" {country.name} ({country.code})",
         f"   Tier: {country.tier.value} | Doctrine: {country.doctrine.value}",
         f"   Capital: {country.capital}",
         f"   Cities: {country.num_cities} | Provinces: {country.num_provinces}",
-        f"   Coastal: {'✅' if country.is_coastal else '❌'}",
+        f"   Coastal: {'OK' if country.is_coastal else 'FAIL'}",
         f"   Double Resources: {', '.join(country.double_resources) or 'none'}",
         f"   Neighbors: {', '.join(country.neighbors)}",
         f"   Expansion: {country.expansion_difficulty}",
         f"   Recommended Mode: {country.recommend_mode()}",
-        f"   📝 {country.notes}",
+        f"    {country.notes}",
     ]
     return "\n".join(lines)
 
 
 def tier_list() -> str:
     """Show all countries grouped by tier."""
-    lines = ["🏆 COUNTRY TIER LIST (World Map)", "=" * 40, ""]
+    lines = ["COUNTRY TIER LIST (World Map)", "=" * 40, ""]
     for tier in Tier:
         countries = [c for c in WORLD_MAP.values() if c.tier == tier]
         if countries:
-            label = {"S": "🥇 S-TIER (God)", "A": "🥈 A-TIER (Strong)",
-                     "B": "🥉 B-TIER (Average)", "C": "💀 C-TIER (Hard)"}
+            label = {"S": "[S] S-TIER (God)", "A": "[A] A-TIER (Strong)",
+                     "B": "[B] B-TIER (Average)", "C": " C-TIER (Hard)"}
             lines.append(label.get(tier.value, tier.value))
             for c in countries:
                 lines.append(f"   {c.name} — {c.notes.split('.')[0]}")
