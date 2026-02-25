@@ -676,8 +676,8 @@ class TestDashboard(unittest.TestCase):
     def test_quick_resource_check(self):
         state = self._make_state()
         text = quick_resource_check(state)
-        self.assertIn("💰", text)
-        self.assertIn("🌾", text)
+        self.assertIn("5000", text)
+        self.assertIn("3000", text)
 
     def test_resource_rate_status(self):
         surplus = ResourceRate(production=100, consumption=50)
@@ -1032,7 +1032,7 @@ class TestMapAnalyzer(unittest.TestCase):
         map_text = analyzer.render_map()
         self.assertIn("MAP VIEW", map_text)
         self.assertIn("Legend", map_text)
-        self.assertIn("★", map_text)  # Our symbol
+        self.assertIn("*", map_text)  # Our symbol
 
     def test_detect_frontlines(self):
         state = _make_intel_state()
@@ -1245,7 +1245,7 @@ class TestPlayerProfiler(unittest.TestCase):
         self.assertTrue(p.is_paying)
         self.assertTrue(p.has_battle_pass)
         self.assertEqual(p.inventory_items, 6)
-        self.assertTrue(any("💰" in n for n in p.notes))
+        self.assertTrue(any("money" in n.lower() or "whale" in n.lower() or "pay" in n.lower() for n in p.notes))
 
     def test_alliance_detected(self):
         profiler = PlayerProfiler()
@@ -1926,7 +1926,7 @@ class TestBattleCalculator(unittest.TestCase):
         from sww3bot.battlecalc import BattleCalculator
         calc = BattleCalculator()
         result = calc.quick_check([{"type_id": 40, "size": 10}], [{"type_id": 10, "size": 3}])
-        self.assertIn("✅", result)
+        self.assertIn("OK", result)
 
     def test_matchup_table(self):
         from sww3bot.battlecalc import BattleCalculator

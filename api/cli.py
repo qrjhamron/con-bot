@@ -75,8 +75,8 @@ COMMANDS = {
     'bypass': 'bypass.py',
     'bypass-loop': 'bypass.py --loop 15',
     'bypass-status': 'bypass.py --status',
-    'tui': 'tui_agent.py',
-    'tui-simple': 'tui_agent.py --simple',
+    'tui': 'agent.py',
+    'tui-simple': 'agent.py --simple',
     'games': 'games.py',
 }
 

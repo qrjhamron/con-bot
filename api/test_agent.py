@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from actions import TOOLS, refresh, _connect, _ensure
-from tui_agent import _execute_function, _build_openai_tools, search_web
+from agent import _execute_function, _build_openai_tools, search_web
 
 # ── Direct function tests (no LLM needed) ────────────────
 

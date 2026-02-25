@@ -28,17 +28,17 @@ cp .env.example .env
 
 # Launch
 source .env
-python api/tui_agent.py
+python api/agent.py
 ```
 
 ## Usage
 
 ### AI Agent (TUI)
 ```bash
-python api/tui_agent.py              # Interactive TUI
-python api/tui_agent.py "cek status" # Single command
-python api/tui_agent.py --auto       # Auto-play loop
-python api/tui_agent.py --simple     # No-curses fallback
+python api/agent.py              # Interactive TUI
+python api/agent.py "cek status" # Single command
+python api/agent.py --auto       # Auto-play loop
+python api/agent.py --simple     # No-curses fallback
 ```
 
 **Shortcuts:** `/status` `/conquer` `/threats` `/armies` `/cities` `/resources` `/ranking` `/produce` `/build` `/search <query>` `/help` `/quit`
@@ -66,7 +66,7 @@ python api/bypass.py --status     # Dry run
 
 ```
 api/                 # CLI scripts & AI agent
-  tui_agent.py       # Main AI agent with TUI
+  agent.py       # Main AI agent with TUI
   actions.py         # 31 game action functions + tool registry
   _conn.py           # Shared connection module
   bypass.py          # Auto-play system

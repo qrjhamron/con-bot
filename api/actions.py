@@ -7,7 +7,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from _conn import (connect, get_locations, get_armies, get_players,
                     get_properties, army_units, army_hp, army_status_str,
-                    unit_name, building_name, UNIT_NAMES, BUILDING_NAMES)
+                    unit_name, unit_category, unit_domain, building_name,
+                    city_type, province_info, province_level_str,
+                    terrain_name, region_name, relation_name,
+                    get_nation_names, resolve_unit_type, resolve_building_type,
+                    UNIT_NAMES, BUILDING_NAMES, UNIT_CATEGORY,
+                    RESEARCH_NAMES, TERRAIN_NAMES, RELATION_NAMES)
 
 _ctrl = _ge = _raw = None
 
@@ -59,7 +64,9 @@ def get_status() -> dict:
             units = []
             for u in army_units(a):
                 if isinstance(u, dict):
-                    units.append({'type': unit_name(u.get('t', 0)), 'hp': u.get('hp', 0)})
+                    tid = u.get('t', 0)
+                    units.append({'type': unit_name(tid), 'category': unit_category(tid),
+                                  'domain': unit_domain(tid), 'hp': u.get('hp', 0)})
             our_armies.append({
                 'id': int(aid), 'status': army_status_str(a.get('s', 0)),
                 'hp': round(army_hp(a)), 'units': units,
@@ -80,7 +87,8 @@ def get_status() -> dict:
             rem = (comp - now_ms) / 3600000
             status = 'producing'
             producing = f"{unit_name(ut)} ({rem:.1f}h)"
-        cities.append({'id': pid, 'status': status, 'producing': producing})
+        cities.append({'id': pid, 'type': city_type(loc), 'morale': loc.get('m', 0),
+                       'status': status, 'producing': producing})
 
     # Wars
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
@@ -146,6 +154,8 @@ def get_armies_detail() -> dict:
                 units.append({
                     'type': unit_name(u.get('t', 0)),
                     'type_id': u.get('t', 0),
+                    'category': unit_category(u.get('t', 0)),
+                    'domain': unit_domain(u.get('t', 0)),
                     'hp': round(u.get('hp', 0), 1),
                     'morale': round(u.get('ml', 1.0) * 100, 1),
                 })
@@ -224,7 +234,7 @@ def get_cities_detail() -> dict:
 
         result.append({
             'city_id': pid, 'level': loc.get('plv', 0),
-            'morale': loc.get('m', 0),
+            'type': city_type(loc), 'morale': loc.get('m', 0),
             'buildings': buildings, 'production': prod_status,
             'producing': producing, 'available_units': available_units,
             'available_buildings': available_buildings[:10],
@@ -264,13 +274,12 @@ def get_players_info() -> dict:
 
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
     our_rels = nr.get('88', {})
-    rel_names = {-2: 'WAR', 6: 'SHARED_INTEL', 99: 'SELF'}
 
     result = []
     for pid, p in sorted(players.items(), key=lambda x: -x[1].get('vps', 0)):
         provs = owners.get(pid, 0)
         rel = our_rels.get(str(pid))
-        rel_str = rel_names.get(rel, '') if rel else ''
+        rel_str = relation_name(rel) if isinstance(rel, (int, float)) else ''
         result.append({
             'player_id': pid,
             'nation': p.get('nationName', ''),
@@ -297,9 +306,11 @@ def get_research_info() -> dict:
                 rid = r.get('researchTypeID')
                 end = r.get('endTime', 0)
                 rem = (end - now_ms) / 3600000
-                current.append({'id': rid, 'hours_remaining': round(rem, 1)})
+                current.append({'id': rid, 'name': RESEARCH_NAMES.get(rid, f'R{rid}'),
+                                'hours_remaining': round(rem, 1)})
 
-    completed = [int(k) for k in s23.get('completedResearches', {}).keys() if k != '@c']
+    completed_ids = [int(k) for k in s23.get('completedResearches', {}).keys() if k != '@c']
+    completed = [{'id': r, 'name': RESEARCH_NAMES.get(r, f'R{r}')} for r in completed_ids]
     slots = s23.get('researchSlots', 0)
 
     return {

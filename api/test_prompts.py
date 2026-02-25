@@ -10,7 +10,7 @@ import sys, os, json, time
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from tui_agent import GradientAgent, _execute_function, SYSTEM_PROMPT, _build_openai_tools
+from agent import GradientAgent, _execute_function, SYSTEM_PROMPT, _build_openai_tools
 from actions import TOOLS, _connect
 
 # ── Test harness ──────────────────────────────────────────
