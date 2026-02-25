@@ -6,6 +6,17 @@ import sys, os, json, time, traceback, textwrap, re
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+# Auto-load .env
+_env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _k, _v = _line.split('=', 1)
+                _v = _v.strip().strip("'").strip('"')
+                os.environ.setdefault(_k.strip(), _v)
+
 import requests as http_requests
 from actions import TOOLS, refresh, _connect
 
@@ -52,7 +63,58 @@ SHORTCUT TOOLS:
 - smart_expansion = analisis target ekspansi paling gampang
 - search_web("query") = cari info strategi dari internet
 
-Kamu commander agresif, efisien, dan selalu cari keuntungan maksimal."""
+Kamu commander agresif, efisien, dan selalu cari keuntungan maksimal.
+
+CARA PANGGIL TOOL: Respond HANYA dengan JSON ini (TANPA markdown/explanation):
+{"name": "function_name", "parameters": {"key": "value"}}
+Contoh: {"name": "get_status", "parameters": {}}
+Contoh: {"name": "produce_unit", "parameters": {"city_id": 612, "unit_type": 3294}}
+JANGAN tulis ```json atau penjelasan. LANGSUNG JSON saja."""
+
+
+def _build_tools_prompt():
+    """Build a tool list description for models that don't support function calling."""
+    lines = ["AVAILABLE TOOLS (call by responding with JSON):"]
+    for tool in TOOLS:
+        params = ', '.join(f'{k}: {v.get("type","string")}' for k, v in tool.get('parameters', {}).items())
+        lines.append(f'  {tool["name"]}({params}) - {tool["description"]}')
+    lines.append('  search_web(query: string) - Search the web for game strategies')
+    lines.append('')
+    lines.append('To call a tool, respond with ONLY this JSON format (no markdown, no explanation):')
+    lines.append('{"name": "function_name", "parameters": {"key": "value"}}')
+    lines.append('')
+    lines.append('After getting the result, explain it to the user in Bahasa Indonesia.')
+    return '\n'.join(lines)
+
+
+_TOOL_NAMES = {t['name'] for t in TOOLS} | {'search_web'}
+
+
+def _parse_text_tool_call(text):
+    """Extract tool call from text response when model doesn't use function calling.
+    
+    Returns list of (name, args) tuples, or empty list if no tool call found.
+    """
+    calls = []
+    seen = set()
+    patterns = [
+        re.compile(r'```(?:json)?\s*(\{.*?\})\s*```', re.DOTALL),
+        re.compile(r'(\{"name"\s*:\s*"[^"]+"\s*,\s*"parameters"\s*:\s*\{.*?\}\s*\})', re.DOTALL),
+    ]
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            try:
+                obj = json.loads(match.group(1))
+                name = obj.get('name', '')
+                params = obj.get('parameters', obj.get('params', obj.get('arguments', {})))
+                if name in _TOOL_NAMES:
+                    key = (name, json.dumps(params, sort_keys=True))
+                    if key not in seen:
+                        seen.add(key)
+                        calls.append((name, params if isinstance(params, dict) else {}))
+            except (json.JSONDecodeError, TypeError):
+                continue
+    return calls
 
 
 def _build_openai_tools():
@@ -224,14 +286,11 @@ class GradientAgent:
 
             choice = resp.get('choices', [{}])[0]
             msg = choice.get('message', {})
-            finish = choice.get('finish_reason', '')
 
-            # Check for tool calls
+            # Check for native tool calls (OpenAI-compatible)
             tool_calls = msg.get('tool_calls', [])
             if tool_calls:
-                # Add assistant message with tool calls
                 self.messages.append(msg)
-
                 for tc in tool_calls:
                     fn = tc.get('function', {})
                     name = fn.get('name', '')
@@ -240,25 +299,37 @@ class GradientAgent:
                     except (json.JSONDecodeError, TypeError):
                         args = {}
                     tc_id = tc.get('id', f'call_{round_num}')
-
                     args_str = ', '.join(f'{k}={v}' for k, v in args.items())
                     self._log(f"  [CALL] {name}({args_str})")
-
                     result_str = _execute_function(name, args)
-
                     preview = result_str[:200] + '...' if len(result_str) > 200 else result_str
                     self._log(f"  [RESULT] {preview}")
-
                     self.messages.append({
-                        'role': 'tool',
-                        'tool_call_id': tc_id,
-                        'content': result_str,
+                        'role': 'tool', 'tool_call_id': tc_id, 'content': result_str,
                     })
-                continue  # Get next response after tool execution
+                continue
 
-            # Text response
+            # Text response — check if it contains a tool call in text
             content = msg.get('content', '')
             if content:
+                text_calls = _parse_text_tool_call(content)
+                if text_calls:
+                    self.messages.append({'role': 'assistant', 'content': content})
+                    all_results = []
+                    for name, args in text_calls:
+                        args_str = ', '.join(f'{k}={v}' for k, v in args.items())
+                        self._log(f"  [CALL] {name}({args_str})")
+                        result_str = _execute_function(name, args)
+                        preview = result_str[:200] + '...' if len(result_str) > 200 else result_str
+                        self._log(f"  [RESULT] {preview}")
+                        all_results.append(f"Result of {name}: {result_str}")
+                    # Feed results back so model can summarize
+                    self.messages.append({
+                        'role': 'user',
+                        'content': f"[TOOL RESULTS]\n" + "\n".join(all_results) + "\n\nJelaskan hasilnya ke user dalam Bahasa Indonesia. JANGAN panggil tool lagi.",
+                    })
+                    continue
+
                 self.messages.append({'role': 'assistant', 'content': content})
                 return content
             return '(no response)'
@@ -268,8 +339,12 @@ class GradientAgent:
     def connect_game(self):
         """Connect to the game server."""
         self._log("[CONN] Connecting to game server...")
-        _connect()
-        self._log("[OK] Connected!")
+        try:
+            _connect()
+            self._log("[OK] Connected!")
+        except Exception as e:
+            self._log(f"[ERR] Connection failed: {e}")
+            self._log("[WARN] Agent will work but game actions will fail until reconnected.")
 
 
 def run_tui(agent):
