@@ -2,7 +2,7 @@
 """Show all players in the game with their stats."""
 
 import argparse, sys, os; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_players
+from _conn import active_player_id, connect, get_locations, get_players
 
 def main():
     parser = argparse.ArgumentParser(description='List all players')
@@ -31,10 +31,10 @@ def main():
     # Get relations (from neighborRelations + diplomaticRelations)
     rels_data = raw.get('states', {}).get('5', {}).get('relations', {})
     nr = rels_data.get('neighborRelations', {})
-    our_rels = dict(nr.get('88', nr.get(88, {})))
+    our_rels = dict(nr.get(str(active_player_id()), nr.get(active_player_id(), {})))
     # Merge diplomaticRelations
     dr = rels_data.get('diplomaticRelations', {})
-    our_dr = dr.get('88', dr.get(88, {}))
+    our_dr = dr.get(str(active_player_id()), dr.get(active_player_id(), {}))
     if isinstance(our_dr, dict):
         for pk, rel in our_dr.items():
             if pk not in our_rels:
@@ -46,8 +46,8 @@ def main():
             for w in wr[1]:
                 if isinstance(w, dict):
                     p1, p2 = w.get('player1', 0), w.get('player2', 0)
-                    if p1 == 88: our_rels[str(p2)] = -2
-                    elif p2 == 88: our_rels[str(p1)] = -2
+                    if p1 == active_player_id(): our_rels[str(p2)] = -2
+                    elif p2 == active_player_id(): our_rels[str(p1)] = -2
     rel_names = {-2:'WARWAR', -1:'CEASE', 0:'EMBARGO', 1:'PEACE',
                  2:'NAP', 3:'ROW', 4:'MIL', 5:'PROT', 6:'INTEL', 7:'CMD'}
     
@@ -75,7 +75,7 @@ def main():
         rel = our_rels.get(str(pid), our_rels.get(pid, None))
         rel_str = rel_names.get(rel, '') if rel is not None else ''
         ai = ' [AI]' if p.get('computerPlayer') else ''
-        marker = ' *' if pid == 88 else (' >' if pid == 87 else '')
+        marker = ' *' if pid == active_player_id() else ''
         print(f"{i:>3} {nation:<22} {vp:>5} {provs:>6} {rel_str:<10} {name}{ai}{marker}")
 
 if __name__ == '__main__':

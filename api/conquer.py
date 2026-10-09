@@ -2,7 +2,7 @@
 """Conquer: auto-send all idle armies to nearest enemy provinces."""
 
 import argparse, sys, os, time; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import (connect, get_locations, get_armies, get_players,
+from _conn import (active_player_id, connect, get_locations, get_armies, get_players,
                     army_units, army_hp, army_status_str)
 
 def main():
@@ -15,13 +15,13 @@ def main():
     locs = get_locations(raw)
     armies = get_armies(raw)
     players = get_players(raw)
-    
+
     loc_map = {l['id']: l for l in locs if isinstance(l, dict)}
-    
+
     # Get enemy provinces
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', nr.get(88, {}))
-    
+    our_rels = nr.get(str(active_player_id()), nr.get(active_player_id(), {}))
+
     enemy_pids = set()
     if args.target:
         enemy_pids.add(args.target)
@@ -37,15 +37,15 @@ def main():
             for w in war_list[1]:
                 if isinstance(w, dict):
                     p1, p2 = w.get('player1', 0), w.get('player2', 0)
-                    if p1 == 88:
+                    if p1 == active_player_id():
                         enemy_pids.add(p2)
-                    elif p2 == 88:
+                    elif p2 == active_player_id():
                         enemy_pids.add(p1)
-    
+
     if not enemy_pids:
         print("No enemies found. Use --target to specify a player ID.")
         return
-    
+
     targets = []
     for loc in locs:
         if isinstance(loc, dict) and loc.get('o', -1) in enemy_pids:
@@ -55,11 +55,11 @@ def main():
                 'x': c.get('x', 0) if isinstance(c, dict) else 0,
                 'y': c.get('y', 0) if isinstance(c, dict) else 0,
             })
-    
+
     # Get idle armies
     idle = []
     for aid, a in armies.items():
-        if isinstance(a, dict) and a.get('o') == 88 and a.get('s') == 1:
+        if isinstance(a, dict) and a.get('o') == active_player_id() and a.get('s') == 1:
             hp = army_hp(a)
             loc = loc_map.get(a.get('l', 0), {})
             c = loc.get('c', {})
@@ -68,13 +68,13 @@ def main():
                 'x': c.get('x', 0) if isinstance(c, dict) else 0,
                 'y': c.get('y', 0) if isinstance(c, dict) else 0,
             })
-    
+
     print(f"{len(targets)} enemy provinces | {len(idle)} idle armies")
-    
+
     if not idle:
         print("No idle armies available.")
         return
-    
+
     # Assign nearest
     used = set()
     for army in sorted(idle, key=lambda x: -x['hp']):
@@ -86,13 +86,13 @@ def main():
             if d < best_d:
                 best_d = d
                 best = t
-        
+
         if not best:
             break
-        
+
         used.add(best['id'])
         nation = players.get(best['owner'], {}).get('nationName', f'P{best["owner"]}')
-        
+
         if args.dry:
             print(f"  #{army['id']} ({army['hp']:.0f}HP) → P{best['id']} ({nation}, M{best['morale']}%)")
         else:

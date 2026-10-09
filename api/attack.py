@@ -2,7 +2,7 @@
 """Attack a province with an army."""
 
 import argparse, sys, os; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_armies, army_hp, get_locations
+from _conn import active_player_id, connect, get_armies, army_hp, get_locations
 
 def main():
     parser = argparse.ArgumentParser(description='Attack province')
@@ -25,7 +25,7 @@ def main():
         armies = get_armies(raw)
         best_id, best_score = None, -1
         for aid, a in armies.items():
-            if not isinstance(a, dict) or a.get('o') != 88:
+            if not isinstance(a, dict) or a.get('o') != active_player_id():
                 continue
             hp = army_hp(a)
             al = loc_map.get(a.get('l', 0), {})

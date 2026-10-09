@@ -5,7 +5,7 @@ import sys, os, time, math
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from _conn import (connect, get_locations, get_armies, get_players,
+from api._conn import (connect, get_locations, get_armies, get_players,
                     get_properties, army_units, army_hp, army_status_str,
                     unit_name, unit_category, unit_domain, building_name,
                     city_type, province_info, province_level_str,
@@ -14,25 +14,34 @@ from _conn import (connect, get_locations, get_armies, get_players,
                     UNIT_NAMES, BUILDING_NAMES, UNIT_CATEGORY,
                     RESEARCH_NAMES, TERRAIN_NAMES, RELATION_NAMES)
 
-_ctrl = _ge = _raw = None
+from sww3bot.game_session import current_session
+
 
 def _connect():
-    global _ctrl, _ge, _raw
-    _ctrl, _ge, _raw = connect()
-    return _ctrl, _ge, _raw
+    session = current_session()
+    session.ctrl, session.ge, session.raw = connect(
+        game_id=session.game_id, player_id=session.player_id)
+    session.player_id = session.ctrl.client.player_id
+    return session.ctrl, session.ge, session.raw
+
 
 def _ensure():
-    if _ctrl is None:
+    session = current_session()
+    if session.ctrl is None:
         _connect()
-    return _ctrl, _ge, _raw
+    return session.ctrl, session.ge, session.raw
+
+
+def _player_id():
+    return current_session().player_id
+
 
 def refresh():
-    """Force refresh game state from server."""
-    global _raw
+    session = current_session()
     ctrl, ge, raw = _ensure()
     ctrl.refresh_state()
-    _raw = ctrl.state
-    return ctrl, ge, _raw
+    session.raw = ctrl.state
+    return ctrl, ge, session.raw
 
 
 def get_status() -> dict:
@@ -45,9 +54,9 @@ def get_status() -> dict:
     s12 = raw.get('states', {}).get('12', {})
     day = s12.get('dayOfGame', '?')
 
-    p88 = players.get(88, {})
-    vp = p88.get('vps', 0)
-    our_provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == 88)
+    our_player = players.get(_player_id(), {})
+    vp = our_player.get('vps', 0)
+    our_provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == _player_id())
 
     res = ge.get_resources()
     resources = {}
@@ -60,7 +69,7 @@ def get_status() -> dict:
 
     our_armies = []
     for aid, a in armies_data.items():
-        if isinstance(a, dict) and a.get('o') == 88:
+        if isinstance(a, dict) and a.get('o') == _player_id():
             units = []
             for u in army_units(a):
                 if isinstance(u, dict):
@@ -74,7 +83,7 @@ def get_status() -> dict:
 
     cities = []
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
         pi = loc.get('pi')
@@ -92,7 +101,7 @@ def get_status() -> dict:
 
     # Wars
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', nr.get(88, {}))
+    our_rels = nr.get(str(_player_id()), nr.get(_player_id(), {}))
     war_pids = set()
     for pk, rel in our_rels.items():
         if isinstance(rel, (int, float)) and rel == -2:
@@ -135,7 +144,7 @@ def get_armies_detail() -> dict:
 
     result = []
     for aid, a in armies_data.items():
-        if not isinstance(a, dict) or a.get('o') != 88:
+        if not isinstance(a, dict) or a.get('o') != _player_id():
             continue
         loc = find_province(a.get('p'))
         owner_name = ''
@@ -143,7 +152,7 @@ def get_armies_detail() -> dict:
         if loc:
             prov_id = loc.get('id')
             ow = loc.get('o')
-            if ow and ow != 88:
+            if ow and ow != _player_id():
                 owner_name = players.get(ow, {}).get('nationName', f'P{ow}')
             else:
                 owner_name = 'ours'
@@ -179,7 +188,7 @@ def get_cities_detail() -> dict:
 
     result = []
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
 
@@ -273,7 +282,7 @@ def get_players_info() -> dict:
                 owners[ow] = owners.get(ow, 0) + 1
 
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', {})
+    our_rels = nr.get(str(_player_id()), nr.get(_player_id(), {}))
 
     result = []
     for pid, p in sorted(players.items(), key=lambda x: -x[1].get('vps', 0)):
@@ -328,7 +337,7 @@ def get_enemy_provinces() -> dict:
     players = get_players(raw)
 
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', {})
+    our_rels = nr.get(str(_player_id()), nr.get(_player_id(), {}))
     war_pids = set()
     for pk, rel in our_rels.items():
         if isinstance(rel, (int, float)) and rel == -2:
@@ -336,7 +345,7 @@ def get_enemy_provinces() -> dict:
 
     # Also include weak AI bots in Africa
     for pid, p in players.items():
-        if p.get('computerPlayer') and pid not in war_pids:
+        if pid != _player_id() and p.get('computerPlayer') and pid not in war_pids:
             provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == pid)
             if 0 < provs <= 15:
                 war_pids.add(pid)
@@ -382,29 +391,34 @@ def find_cities(country: str) -> dict:
             'cities': cities, 'city_count': len(cities)}
 
 
+class AmbiguousPlayer(ValueError):
+    def __init__(self, candidates):
+        self.candidates = candidates
+        super().__init__('Beberapa pemain cocok; pilih target yang dimaksud.')
+
+
 def _resolve_player(name_or_id) -> int:
-    try:
-        return int(name_or_id)
-    except (ValueError, TypeError):
-        pass
     ctrl, ge, raw = _ensure()
     players = get_players(raw)
-    name_lower = str(name_or_id).lower().strip()
-    # Exact match first
-    for pid, p in players.items():
-        nn = p.get('nationName', '').lower()
-        dn = p.get('defaultNationName', '').lower()
-        un = p.get('name', '').lower()
-        if name_lower == nn or name_lower == dn or name_lower == un:
-            return pid
-    # Substring match requiring >75% length overlap to prevent "Niger" matching "Nigeria"
-    for pid, p in players.items():
-        nn = p.get('nationName', '').lower()
-        dn = p.get('defaultNationName', '').lower()
-        if (name_lower in nn and len(name_lower) > len(nn) * 0.75) or \
-           (name_lower in dn and len(name_lower) > len(dn) * 0.75):
-            return pid
-    return -1
+    try:
+        pid = int(name_or_id)
+        return pid if pid in players else -1
+    except (ValueError, TypeError):
+        pass
+    name = str(name_or_id).casefold().strip()
+    exact, partial = [], []
+    for pid, player in players.items():
+        names = [str(player.get(k, '')).casefold() for k in ('nationName', 'defaultNationName', 'name')]
+        item = {'id': pid, 'label': player.get('nationName') or player.get('name') or str(pid)}
+        if name in names:
+            exact.append(item)
+        elif name and any(name in n for n in names):
+            partial.append(item)
+    matches = exact or partial
+    if len(matches) > 1:
+        raise AmbiguousPlayer(matches)
+    return matches[0]['id'] if matches else -1
+
 
 def move_army(army_id: int, target_province: int) -> dict:
     """Move an army to a target province."""
@@ -504,7 +518,7 @@ def auto_conquer() -> dict:
     players = get_players(raw)
 
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', {})
+    our_rels = nr.get(str(_player_id()), nr.get(_player_id(), {}))
     war_pids = set()
     for pk, rel in our_rels.items():
         if isinstance(rel, (int, float)) and rel == -2:
@@ -519,7 +533,7 @@ def auto_conquer() -> dict:
         return pos.get('x', 0), pos.get('y', 0)
 
     for aid, a in armies_data.items():
-        if isinstance(a, dict) and a.get('o') == 88 and a.get('s') == 1:
+        if isinstance(a, dict) and a.get('o') == _player_id() and a.get('s') == 1:
             idle.append((int(aid), a))
 
     targets = []
@@ -565,7 +579,7 @@ def auto_produce() -> dict:
 
     results = []
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
         if loc.get('pi'):
@@ -617,7 +631,7 @@ def build_in_all_cities(building_type: str) -> dict:
 
     results = []
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
         us = loc.get('us', [])
@@ -648,7 +662,7 @@ def declare_war_on_all_bots() -> dict:
 
     results = []
     for pid, p in players.items():
-        if not p.get('computerPlayer'):
+        if pid == _player_id() or not p.get('computerPlayer'):
             continue
         provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == pid)
         if provs <= 0 or provs > 15:
@@ -674,7 +688,7 @@ def send_message(player_id, message: str) -> dict:
         return {'success': False, 'error': f'Player not found: {player_id}'}
     try:
         r = ge.send_message(pid, message)
-        return {'success': True, 'player_id': pid}
+        return {'success': bool(r), 'player_id': pid}
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
@@ -717,7 +731,7 @@ def auto_build_infrastructure() -> dict:
     essential = [2245, 2250, 2271, 2016]
     results = []
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
         us = loc.get('us', [])
@@ -825,14 +839,14 @@ def get_battle_log() -> dict:
     for aid, a in armies_data.items():
         if not isinstance(a, dict):
             continue
-        if a.get('o') == 88 and a.get('s') == 3:  # our ATTACKING armies
+        if a.get('o') == _player_id() and a.get('s') == 3:  # our ATTACKING armies
             target = a.get('tg', {})
             target_id = target.get('id', 0) if isinstance(target, dict) else 0
             battles.append({
                 'army_id': int(aid), 'status': 'ATTACKING',
                 'hp': round(army_hp(a), 1), 'target': target_id,
             })
-        elif a.get('o') != 88 and a.get('s') in (2, 3):  # enemy moving/attacking
+        elif a.get('o') != _player_id() and a.get('s') in (2, 3):  # enemy moving/attacking
             owner = a.get('o', 0)
             nation = players.get(owner, {}).get('nationName', f'P{owner}')
             battles.append({
@@ -850,7 +864,7 @@ def scan_threats() -> dict:
     players = get_players(raw)
 
     # Get center of our territory
-    our_provs = [l for l in locs if isinstance(l, dict) and l.get('o') == 88 and 'c' in l]
+    our_provs = [l for l in locs if isinstance(l, dict) and l.get('o') == _player_id() and 'c' in l]
     if not our_provs:
         return {'threats': [], 'warning': 'No territory found'}
     avg_x = sum(l['c'].get('x', 0) for l in our_provs if isinstance(l.get('c'), dict)) / len(our_provs)
@@ -858,7 +872,7 @@ def scan_threats() -> dict:
 
     threats = []
     for aid, a in armies_data.items():
-        if not isinstance(a, dict) or a.get('o') == 88:
+        if not isinstance(a, dict) or a.get('o') == _player_id():
             continue
         pos = a.get('p', {})
         if not isinstance(pos, dict):
@@ -885,13 +899,13 @@ def smart_expansion() -> dict:
     # Our border provinces
     our_provs = set()
     for l in locs:
-        if isinstance(l, dict) and l.get('o') == 88:
+        if isinstance(l, dict) and l.get('o') == _player_id():
             our_provs.add(l.get('id'))
 
     # Our province positions for distance checks
     our_positions = []
     for l in locs:
-        if isinstance(l, dict) and l.get('o') == 88:
+        if isinstance(l, dict) and l.get('o') == _player_id():
             c = l.get('c', {})
             if isinstance(c, dict):
                 our_positions.append((c.get('x', 0), c.get('y', 0)))
@@ -899,7 +913,7 @@ def smart_expansion() -> dict:
     # Find neighbors
     neighbor_owners = {}
     for l in locs:
-        if not isinstance(l, dict) or l.get('o') == 88 or not l.get('o'):
+        if not isinstance(l, dict) or l.get('o') == _player_id() or not l.get('o'):
             continue
         owner = l.get('o')
         c = l.get('c', {})
@@ -950,7 +964,7 @@ def move_all_idle_to_target(player_id: int) -> dict:
         return {'success': False, 'error': f'{name} has no provinces'}
 
     idle = [(int(aid), a) for aid, a in armies_data.items()
-            if isinstance(a, dict) and a.get('o') == 88 and a.get('s') == 1]
+            if isinstance(a, dict) and a.get('o') == _player_id() and a.get('s') == 1]
 
     def army_pos(a):
         p = a.get('p', {})
@@ -977,7 +991,7 @@ def move_all_idle_to_target(player_id: int) -> dict:
             moves.append({'army_id': aid, 'target': best['id'], 'success': ar == 1})
 
     nation = players.get(pid, {}).get('nationName', f'P{pid}')
-    return {'target': nation, 'deployed': len(moves), 'moves': moves}
+    return {'target': nation, 'deployed': sum(m['success'] for m in moves), 'moves': moves}
 
 
 def _extract_ar(response):

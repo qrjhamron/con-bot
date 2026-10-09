@@ -2,7 +2,7 @@
 """Spy operations: recruit, deploy, list, recall."""
 
 import argparse, sys, os, json; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_players
+from _conn import active_player_id, connect, get_locations, get_players
 
 MISSIONS = {
     'intel': 0, 'economic': 1, 'military': 2, 'sabotage': 3,
@@ -30,7 +30,7 @@ def main():
     if args.cmd == 'list':
         s7 = raw.get('states', {}).get('7', {})
         nations = s7.get('nations', {})
-        our = nations.get('88', nations.get(88, {}))
+        our = nations.get(str(active_player_id()), nations.get(active_player_id(), {}))
         players = get_players(raw)
         
         if not our or (isinstance(our, dict) and len(our) <= 1):

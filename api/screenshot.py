@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 BOT_USER = os.environ.get("BOT_USER", "")
 BOT_PASS = os.environ.get("BOT_PASS", "")
-GAME_ID = int(os.environ.get("GAME_ID", "10687600"))
+GAME_ID = int(os.environ.get("GAME_ID", "0"))
 SCREENSHOT_DIR = os.path.join(os.path.dirname(__file__), '..', 'screenshots')
 
 def main():

@@ -2,7 +2,7 @@
 """ASCII map of Africa showing territories and armies."""
 
 import sys, os; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_armies, get_players, army_hp
+from _conn import active_player_id, connect, get_locations, get_armies, get_players, army_hp
 
 def main():
     ctrl, ge, raw = connect()
@@ -37,7 +37,7 @@ def main():
     
     grid = [[' '] * MAP_W for _ in range(MAP_H)]
     
-    OWNER_CHARS = {88: '█', 87: '▓', 29: '░', 121: '▒'}
+    OWNER_CHARS = {active_player_id(): '█'}
     
     for loc in africa_locs:
         owner = loc.get('o', -1)
@@ -52,7 +52,7 @@ def main():
     # Place armies
     loc_map = {l['id']: l for l in locs if isinstance(l, dict)}
     for aid, a in armies.items():
-        if not isinstance(a, dict) or a.get('o') != 88:
+        if not isinstance(a, dict) or a.get('o') != active_player_id():
             continue
         loc = loc_map.get(a.get('l', 0), {})
         c = loc.get('c', {})
@@ -61,12 +61,13 @@ def main():
             grid[my][mx] = '*' if army_hp(a) >= 50 else 'o'
     
     print(f"+{'='*MAP_W}+")
-    print(f"|{' AFRICA MAP — Nigeria (P88)':^{MAP_W}}|")
+    label = f' GAME MAP — Player {active_player_id()}'
+    print(f"|{label:^{MAP_W}}|")
     print(f"+{'='*MAP_W}+")
     for row in grid:
         print(f"|{''.join(row)}|")
     print(f"+{'='*MAP_W}+")
-    print(f"|{'█=Nigeria ▓=Morocco ░=Ghana ▒=Niger *o=Army ·=Other':^{MAP_W}}|")
+    print(f"|{'█=Your territory *o=Army ·=Other':^{MAP_W}}|")
     print(f"+{'='*MAP_W}+")
 
 if __name__ == '__main__':

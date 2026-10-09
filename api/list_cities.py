@@ -2,7 +2,7 @@
 """List all cities with buildings, production, and construction status."""
 
 import sys, os, json, time; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_properties, building_name, unit_name
+from _conn import active_player_id, connect, get_locations, get_properties, building_name, unit_name
 
 def main():
     ctrl, ge, raw = connect()
@@ -12,7 +12,7 @@ def main():
     
     cities = []
     for loc in locs:
-        if isinstance(loc, dict) and loc.get('o') == 88 and loc.get('plv', 0) >= 4:
+        if isinstance(loc, dict) and loc.get('o') == active_player_id() and loc.get('plv', 0) >= 4:
             cities.append(loc)
     
     cities.sort(key=lambda x: -x.get('plv', 0))

@@ -2,7 +2,7 @@
 """Show game leaderboard/ranking."""
 
 import argparse, sys, os; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_players
+from _conn import active_player_id, connect, get_locations, get_players
 
 def main():
     parser = argparse.ArgumentParser(description='Show ranking')
@@ -32,7 +32,7 @@ def main():
         vp = p.get('vps', 0)
         provs = prov_counts.get(pid, 0)
         name = p.get('name', '?')
-        marker = ' *' if pid == 88 else (' >' if pid == 87 else '')
+        marker = ' *' if pid == active_player_id() else ''
         print(f"{i:>3} {nation:<22} {vp:>5} {provs:>6} {name:<20}{marker}")
 
 if __name__ == '__main__':

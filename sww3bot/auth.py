@@ -191,6 +191,7 @@ class BytroAuth:
             "uberAuthTstamp": params.get("uberAuthTstamp", ""),
             "userID": params.get("userID", str(self.user_id)),
             "gameID": str(game_id),
+            "playerID": params.get("playerID", "0"),
             "mapID": params.get("mapID", ""),
         }
 

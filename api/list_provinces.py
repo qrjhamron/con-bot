@@ -2,19 +2,19 @@
 """List all our provinces, optionally filter by type."""
 
 import argparse, sys, os, json; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, building_name
+from _conn import active_player_id, connect, get_locations, building_name
 
 def main():
     parser = argparse.ArgumentParser(description='List provinces')
     parser.add_argument('--cities', action='store_true', help='Show only cities (plv >= 4)')
-    parser.add_argument('--player', type=int, default=88, help='Player ID (default: 88)')
+    parser.add_argument('--player', type=int, default=None, help='Player ID (default: active player)')
     parser.add_argument('--enemy', type=int, help='Show enemy provinces for this player ID')
     args = parser.parse_args()
 
     ctrl, ge, raw = connect()
     locs = get_locations(raw)
     
-    target_owner = args.enemy if args.enemy else args.player
+    target_owner = args.enemy if args.enemy else (args.player or active_player_id())
     
     provs = []
     for loc in locs:

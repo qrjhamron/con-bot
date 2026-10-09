@@ -2,7 +2,7 @@
 """List all armies with unit breakdown per province."""
 
 import argparse, sys, os, json; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_armies, get_players, army_units, army_hp, army_status_str, unit_name
+from _conn import active_player_id, connect, get_locations, get_armies, get_players, army_units, army_hp, army_status_str, unit_name
 
 def main():
     parser = argparse.ArgumentParser(description='List armies')
@@ -24,7 +24,7 @@ def main():
         owner = a.get('o', 0)
         if args.player and owner != args.player:
             continue
-        if not args.all and not args.player and owner != 88:
+        if not args.all and not args.player and owner != active_player_id():
             continue
         filtered[aid] = a
     

@@ -3,6 +3,9 @@
 
 import sys
 import os
+from contextvars import ContextVar
+from pathlib import Path
+from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -11,35 +14,90 @@ from sww3bot.api import SupremacyWW3
 from sww3bot.controller import GameController
 from sww3bot.exploits import GameExploits
 
+load_dotenv(Path(__file__).resolve().parents[1] / '.env', override=False)
+_active_player = ContextVar('cli_active_player', default=0)
+
+
+def active_player_id():
+    player_id = _active_player.get() or PLAYER_ID
+    if not player_id:
+        raise ValueError('Connect to a game before reading player identity')
+    return player_id
+
 BOT_USER = os.environ.get("BOT_USER", "")
 BOT_PASS = os.environ.get("BOT_PASS", "")
-GAME_ID = int(os.environ.get("GAME_ID", "10687600"))
-PLAYER_ID = int(os.environ.get("PLAYER_ID", "88"))
+GAME_ID = int(os.environ.get("GAME_ID", "0"))
+PLAYER_ID = int(os.environ.get("PLAYER_ID", "0"))
 
 
-def connect(refresh=True):
-    """Login, connect to game server, return (ctrl, ge, raw).
-    
-    Returns:
-        tuple: (GameController, GameExploits, raw_state_dict)
-    """
+def discover_player(raw, user_id, username, configured=0):
+    """Resolve account ownership from fresh player state, never from a nation default."""
+    players = get_players(raw)
+    matches = []
+    for pid, player in players.items():
+        identity = player.get('userID', player.get('userId', player.get('siteUserID')))
+        name = player.get('name', player.get('userName', ''))
+        if (identity is not None and str(identity) == str(user_id)) or (
+            username and str(name).casefold() == str(username).casefold()
+        ):
+            matches.append(pid)
+    if len(matches) == 1:
+        if configured and configured != matches[0]:
+            raise ValueError('PLAYER_ID does not belong to the logged-in account in this game')
+        return matches[0]
+    if configured and not matches and configured in players:
+        player = players[configured]
+        identity = player.get('userID', player.get('userId', player.get('siteUserID')))
+        if identity not in (None, 0, '0', '') and str(identity) != str(user_id):
+            raise ValueError('PLAYER_ID belongs to another account')
+        return configured
+    raise ValueError('Cannot identify your player. Set PLAYER_ID for this game explicitly.')
+
+
+def connect(refresh=True, game_id=None, player_id=None, username=None, password=None):
+    if game_id is None:
+        # The same selection used by Telegram and con-agent applies to standalone scripts.
+        from sww3bot.agent_store import Store
+        db_path = os.getenv('BOT_DB_PATH', 'data/con-bot.sqlite3')
+        if Path(db_path).expanduser().exists():
+            store = Store(db_path)
+            try:
+                selected = store.preference('game_id', GAME_ID)
+            finally:
+                store.close()
+            if selected != GAME_ID and player_id is None:
+                player_id = 0
+            game_id = selected
+    game_id = GAME_ID if game_id is None else int(game_id)
+    player_id = PLAYER_ID if player_id is None else int(player_id)
+    if game_id <= 0:
+        raise ValueError('Select a game first or set GAME_ID')
     auth = BytroAuth()
-    auth.login(BOT_USER, BOT_PASS)
-    ga = auth.get_game_auth(GAME_ID)
+    username = BOT_USER if username is None else username
+    try:
+        auth.login(username, BOT_PASS if password is None else password)
+        ga = auth.get_game_auth(game_id)
+    finally:
+        auth.session.close()
     client = SupremacyWW3(
-        game_id=str(GAME_ID),
-        server_url=f"https://{ga['gs']}",
-        player_id=PLAYER_ID,
-        auth_token=ga['auth'],
-        auth_hash=ga['authHash'],
-        auth_tstamp=ga['authTstamp'],
-        site_user_id=auth.user_id,
+        game_id=str(game_id), server_url=f"https://{ga['gs']}",
+        player_id=player_id or int(ga.get('playerID') or 0),
+        auth_token=ga['auth'], auth_hash=ga['authHash'],
+        auth_tstamp=ga['authTstamp'], site_user_id=auth.user_id,
     )
-    ctrl = GameController(client)
-    if refresh:
-        ctrl.refresh_state()
-    ge = GameExploits(ctrl)
-    return ctrl, ge, ctrl.state
+    try:
+        ctrl = GameController(client)
+        raw = ctrl.refresh_state()
+        resolved = discover_player(raw, auth.user_id, username, client.player_id)
+        if client.player_id != resolved:
+            client.player_id = resolved
+            raw = ctrl.refresh_state()
+        ge = GameExploits(ctrl)
+        _active_player.set(resolved)
+        return ctrl, ge, raw
+    except BaseException:
+        client.session.close()
+        raise
 
 
 def get_locations(raw):
@@ -59,7 +117,11 @@ def get_players(raw):
     result = {}
     for pk, pv in players.items():
         if isinstance(pv, dict):
-            result[pv.get('playerID', 0)] = pv
+            try:
+                pid = int(pv.get('playerID', pk))
+            except (ValueError, TypeError):
+                continue
+            result[pid] = pv
     return result
 
 

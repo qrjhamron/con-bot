@@ -2,7 +2,7 @@
 """Full game status dashboard."""
 
 import sys, os, time; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import (connect, get_locations, get_armies, get_players,
+from _conn import (active_player_id, connect, get_locations, get_armies, get_players,
                     army_units, army_hp, army_status_str, unit_name)
 
 def main():
@@ -11,32 +11,32 @@ def main():
     armies = get_armies(raw)
     players = get_players(raw)
     now_ms = time.time() * 1000
-    
+
     # Game info
     s12 = raw.get('states', {}).get('12', {})
     day = s12.get('dayOfGame', '?')
     next_day = s12.get('nextDayTime', 0)
     hrs_to_day = (next_day - now_ms) / 3600000 if next_day > 0 else 0
-    
+
     # Our info
-    p88 = players.get(88, {})
+    p88 = players.get(active_player_id(), {})
     vp = p88.get('vps', 0)
-    our_provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == 88)
-    
+    our_provs = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == active_player_id())
+
     # Resources
     res = ge.get_resources()
-    
+
     # Armies
     our_armies = []
     for aid, a in armies.items():
-        if isinstance(a, dict) and a.get('o') == 88:
+        if isinstance(a, dict) and a.get('o') == active_player_id():
             our_armies.append((int(aid), a))
-    
+
     total_units = sum(len(army_units(a)) for _, a in our_armies)
     total_hp = sum(army_hp(a) for _, a in our_armies)
-    
+
     print(f"SUPREMACY WW3 DASHBOARD")
-    print(f"Day {day} | 4x Speed | Nigeria (P88)")
+    print(f"Day {day} | {players.get(active_player_id(), {}).get('nationName', '')} (P{active_player_id()})")
     print(f"VP: {vp} | Provinces: {our_provs} | Next day: {hrs_to_day:.0f}h")
     print()
 
@@ -70,7 +70,7 @@ def main():
     print()
 
     print("Production:")
-    cities = [l for l in locs if isinstance(l, dict) and l.get('o') == 88 and l.get('plv', 0) >= 4]
+    cities = [l for l in locs if isinstance(l, dict) and l.get('o') == active_player_id() and l.get('plv', 0) >= 4]
     for city in sorted(cities, key=lambda x: x.get('id', 0)):
         pid = city.get('id', 0)
         pi = city.get('pi', {})
@@ -85,7 +85,7 @@ def main():
     print()
 
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', nr.get(88, {}))
+    our_rels = nr.get(str(active_player_id()), nr.get(active_player_id(), {}))
     war_pids = set()
     for pk, rel in our_rels.items():
         if isinstance(rel, (int, float)) and rel == -2:
@@ -98,7 +98,7 @@ def main():
                     tp = cmd.get('tp')
                     if tp:
                         for l in locs:
-                            if isinstance(l, dict) and l.get('id') == tp and l.get('o') and l.get('o') != 88:
+                            if isinstance(l, dict) and l.get('id') == tp and l.get('o') and l.get('o') != active_player_id():
                                 war_pids.add(l.get('o'))
 
     print("Wars:")

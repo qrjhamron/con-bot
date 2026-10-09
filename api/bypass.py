@@ -20,7 +20,7 @@ import sys, os, time, math, argparse
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from _conn import (connect, get_locations, get_armies, get_players,
+from _conn import (active_player_id, connect, get_locations, get_armies, get_players,
                     get_properties, army_units, army_hp, unit_name, building_name)
 from actions import _extract_ar
 
@@ -38,7 +38,7 @@ def run_bypass(dry_run=False):
 
     # 1. AUTO WAR — re-declare on all weak AI bots
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
-    our_rels = nr.get('88', {})
+    our_rels = nr.get(str(active_player_id()), {})
     at_war = {int(k) for k, v in our_rels.items() if isinstance(v, (int, float)) and v == -2}
 
     # Find weak AI bots not at war
@@ -67,7 +67,7 @@ def run_bypass(dry_run=False):
     # Find idle armies
     idle_armies = []
     for aid, a in armies_data.items():
-        if not isinstance(a, dict) or a.get('o') != 88:
+        if not isinstance(a, dict) or a.get('o') != active_player_id():
             continue
         if a.get('s') == 1:  # IDLE
             # Check if army already has queued commands
@@ -132,7 +132,7 @@ def run_bypass(dry_run=False):
         pass
 
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != active_player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
         if loc.get('pi'):
@@ -165,7 +165,7 @@ def run_bypass(dry_run=False):
     essential_buildings = [2245, 2250, 2271, 2016]  # Recruiting Office, Local Industry, Army Base, Arms Industry
 
     for loc in locs:
-        if not isinstance(loc, dict) or loc.get('o') != 88 or loc.get('plv', 0) < 4:
+        if not isinstance(loc, dict) or loc.get('o') != active_player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
 

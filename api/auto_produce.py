@@ -2,7 +2,7 @@
 """Produce units in all idle cities automatically."""
 
 import argparse, sys, os, time; sys.path.insert(0, os.path.dirname(__file__))
-from _conn import connect, get_locations, get_properties, unit_name
+from _conn import active_player_id, connect, get_locations, get_properties, unit_name
 
 def main():
     parser = argparse.ArgumentParser(description='Auto-produce in all idle cities')
@@ -16,7 +16,7 @@ def main():
     
     cities = []
     for loc in locs:
-        if isinstance(loc, dict) and loc.get('o') == 88 and loc.get('plv', 0) >= 4:
+        if isinstance(loc, dict) and loc.get('o') == active_player_id() and loc.get('plv', 0) >= 4:
             pi = loc.get('pi', {})
             is_idle = not (pi and isinstance(pi, dict) and pi.get('u'))
             if is_idle:
