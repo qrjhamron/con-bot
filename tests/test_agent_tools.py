@@ -1,4 +1,5 @@
 import json
+import copy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -26,7 +27,7 @@ def raw_state(player=7):
             {'id': 12, 'o': 8, 'plv': 4, 'name': 'Springfield', 'c': {'x': 2, 'y': 2}},
             {'id': 13, 'o': 9, 'plv': 4, 'name': 'Springfield', 'c': {'x': 3, 'y': 3}},
         ]]}, 'properties': {}},
-        '6': {'armies': {'1': {'o': player, 's': 1, 'p': {}, 'u': ['', []]},
+        '6': {'armies': {'1': {'id': 1, 'o': player, 's': 2, 'p': {}, 'u': ['', [{'t': 3294, 's': 2}]]},
                          '2': {'o': 88, 's': 1, 'p': {}, 'u': ['', []]}}},
         '5': {'relations': {'neighborRelations': {str(player): {'8': -2}}}},
     }}
@@ -39,6 +40,7 @@ class Controller:
         self.sent = []
         self.on_send = None
         self.fail = False
+        self.apply = True
 
     def refresh_state(self):
         return self.state
@@ -47,15 +49,26 @@ class Controller:
         self.sent.append(sub)
         if self.fail:
             raise requests.Timeout('network gone')
+        if self.apply:
+            if sub['@c'].endswith('UltArmyAction'):
+                for army in sub['armies'][1]:
+                    self.state['states']['6']['armies'][str(army['id'])]['c'] = copy.deepcopy(army['c'])
+            elif sub['@c'].endswith('UltUpdateProvinceAction'):
+                for pid in sub['provinceIDs'][1]:
+                    city = next(p for p in self.state['states']['3']['map']['locations'][1] if p['id'] == pid)
+                    city['us'] = ['', [sub['upgrade']]]
         if self.on_send:
             self.on_send()
         return {'result': {'actionResults': {'a': 1}}}
 
     def move_army(self, army, target):
-        return self._send_sub_action({'@c': 'Move', 'army': army, 'target': target})
+        province = next(p for p in self.state['states']['3']['map']['locations'][1] if p['id'] == target)
+        return self._send_sub_action({'@c': 'ultshared.action.UltArmyAction', 'armies': ['', [
+            {'id': army, 'o': 7, 'c': ['', [{'@c': 'gc', 'tp': province['c']}]]}]]})
 
     def build_building(self, city, building):
-        return self._send_sub_action({'@c': 'Build', 'city': city, 'building': building})
+        return self._send_sub_action({'@c': 'ultshared.action.UltUpdateProvinceAction', 'mode': 1,
+                                     'provinceIDs': ['', [city]], 'upgrade': {'id': building}})
 
 
 @pytest.fixture
@@ -87,6 +100,40 @@ def test_registry_required_optional_types_and_no_extra_args():
     assert registry.validate('deploy_spy', {'province_id': 10})[1]['mission_type'] == 0
     assert registry.validate('declare_war', {'player_id': 8})[0] is not None
     assert registry.validate('buy_market_resource', {'resource': 'metal', 'amount': 0})[0] is None
+
+
+def test_enemy_intel_only_reads_current_day_report(monkeypatch):
+    player = 7
+    army = {'l': 11, 'u': ['', [{'t': 3294, 's': 2}]]}
+    raw = {'states': {'7': {'spyReport': {'currentDay': 4, 'dailyStates': ['', [
+        {'day': 3, 'detailedStates': ['', [{'@c': 'UltDetailedSpyState', 'playerID': 88,
+                                            'armyState': {'armies': {'1': army}}}]]},
+        {'day': 4, 'detailedStates': ['', [None, {'@c': 'UltDetailedSpyState', 'playerID': 88,
+                                                 'armyState': {'armies': {'99': army}}}]]},
+    ]]}}}}
+    monkeypatch.setattr(actions, 'refresh', lambda: (None, None, raw))
+    monkeypatch.setattr(actions, '_resolve_player', lambda _: 88)
+    monkeypatch.setattr(actions, '_player_id', lambda: player)
+    monkeypatch.setattr(actions, 'get_players', lambda _: {88: {'nationName': 'Niger'}})
+    result = actions.get_enemy_intel('Niger', 11)
+    assert result['intel_available'] is True
+    assert result['day'] == 4
+    assert result['armies'][0]['army_id'] == '99'
+    assert result['armies'][0]['units'][0]['count'] == 2
+
+
+def test_enemy_intel_does_not_fall_back_to_stale_report(monkeypatch):
+    raw = {'states': {'7': {'spyReport': {'currentDay': 5, 'dailyStates': ['', [
+        {'day': 4, 'detailedStates': ['', [{'@c': 'UltDetailedSpyState', 'playerID': 88,
+                                            'armyState': {'armies': {'1': {'l': 11}}}}]]}
+    ]]}}}}
+    monkeypatch.setattr(actions, 'refresh', lambda: (None, None, raw))
+    monkeypatch.setattr(actions, '_resolve_player', lambda _: 88)
+    monkeypatch.setattr(actions, '_player_id', lambda: 7)
+    monkeypatch.setattr(actions, 'get_players', lambda _: {88: {'nationName': 'Niger'}})
+    result = actions.get_enemy_intel('Niger')
+    assert result['intel_available'] is False
+    assert 'armies' not in result
 
 
 async def test_nondefault_player_status_and_context_isolation(executor, settings, store):
@@ -123,7 +170,7 @@ async def test_journal_before_send_and_successful_mutation(executor, settings, s
     runtime.action_event = record
     result = await executor.execute(42, 'move_army', {'army_id': 1, 'target_province': 12}, runtime)
     assert result.ok
-    assert events == ['start', 'finish']
+    assert events == ['unresolved', 'start', 'finish']
     assert store.steps(runtime.task_id)[0]['status'] == 'completed'
     assert len(executor.session(42).ctrl.sent) == 1
 
@@ -224,11 +271,11 @@ async def test_known_zero_result_is_rejection_not_unknown(executor, settings, st
     runtime = rt(settings, store)
     result = await executor.execute(42, 'move_army', {'army_id': 1, 'target_province': 12}, runtime)
     assert not result.ok
-    assert result.error['code'] == 'action_failed'
+    assert result.error['code'] == 'rejected'
     assert store.steps(runtime.task_id)[0]['status'] == 'failed'
 
 
-async def test_successful_send_then_failed_refresh_retains_success(executor, settings, store):
+async def test_accepted_send_then_failed_refresh_is_unverified(executor, settings, store):
     controller = executor.session(42).ctrl
     calls = 0
     original = controller.refresh_state
@@ -242,7 +289,7 @@ async def test_successful_send_then_failed_refresh_retains_success(executor, set
     runtime = rt(settings, store)
     result = await executor.execute(42, 'move_army', {'army_id': 1, 'target_province': 12}, runtime)
     assert result.error['code'] == 'interrupted'
-    assert store.steps(runtime.task_id)[0]['status'] == 'completed'
+    assert store.steps(runtime.task_id)[0]['status'] == 'unknown'
     assert len(controller.sent) == 1
 
 
@@ -284,3 +331,47 @@ async def test_cancel_during_progress_before_send_does_not_send(executor, settin
     assert result.error['code'] == 'cancelled'
     assert executor.session(42).ctrl.sent == []
     assert store.steps(runtime.task_id)[0]['status'] == 'cancelled'
+
+
+async def test_accepted_but_unchanged_movement_is_unknown_and_not_repeated(executor, settings, store, monkeypatch):
+    monkeypatch.setattr('sww3bot.agent_tools.time.sleep', lambda seconds: None)
+    controller = executor.session(42).ctrl
+    controller.apply = False
+    runtime = rt(settings, store)
+    args = {'army_id': 1, 'target_province': 12}
+    result = await executor.execute(42, 'move_army', args, runtime)
+    assert not result.ok
+    assert result.error['code'] == 'interrupted'
+    assert store.steps(runtime.task_id)[0]['status'] == 'unknown'
+    assert len(controller.sent) == 1
+    again = await executor.execute(42, 'move_army', args, rt(settings, store))
+    assert not again.ok
+    assert len(controller.sent) == 1
+
+
+async def test_manual_route_is_observed_without_sending_again(executor, settings, store):
+    controller = executor.session(42).ctrl
+    controller.state['states']['6']['armies']['1']['c'] = ['', [{'@c': 'gc', 'tp': {'x': 2, 'y': 2}, 'at': 123}]]
+    runtime = rt(settings, store)
+    result = await executor.execute(42, 'move_army', {'army_id': 1, 'target_province': 12}, runtime)
+    assert result.ok
+    assert controller.sent == []
+    assert result.data['verification'][0]['status'] == 'already_applied'
+    assert store.steps(runtime.task_id)[0]['status'] == 'already_applied'
+    assert runtime.mutations == 0
+
+
+async def test_later_manual_state_resolves_prior_unknown_without_attributing_action(executor, settings, store, monkeypatch):
+    monkeypatch.setattr('sww3bot.agent_tools.time.sleep', lambda seconds: None)
+    controller = executor.session(42).ctrl
+    controller.apply = False
+    old = rt(settings, store)
+    args = {'army_id': 1, 'target_province': 12}
+    await executor.execute(42, 'move_army', args, old)
+    controller.state['states']['6']['armies']['1']['c'] = ['', [{'@c': 'gc', 'tp': {'x': 2, 'y': 2}, 'at': 123}]]
+    now = rt(settings, store)
+    result = await executor.execute(42, 'move_army', args, now)
+    assert result.data['verification'][0]['status'] == 'already_applied'
+    assert store.steps(old.task_id)[0]['status'] == 'observed_later'
+    assert len(controller.sent) == 1
+    assert now.mutations == 0

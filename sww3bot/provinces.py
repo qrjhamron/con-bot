@@ -121,15 +121,9 @@ class ProvinceTranslator:
                 "morale": item.get("m", 0),
                 "terrain": item.get("tt", 0),
             }
-            if item.get("n") and item["n"] != "sea":
-                self.city_names[pid] = item["n"]
-
-        # Apply built-in city database
-        map_base = str(self.map_id).split("_")[0] if self.map_id else ""
-        if map_base == "6006":
-            for pid, name in KNOWN_CITIES_6006.items():
-                if pid not in self.city_names:
-                    self.city_names[pid] = name
+            name = item.get("name") or item.get("n")
+            if isinstance(name, str) and name.strip() and not name.strip().isdigit():
+                self.city_names[pid] = name
 
         logger.info(
             "Loaded %d provinces, %d named, map=%s",

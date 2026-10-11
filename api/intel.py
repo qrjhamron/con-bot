@@ -5,6 +5,8 @@ import argparse, sys, os, json, time; sys.path.insert(0, os.path.dirname(__file_
 from _conn import (active_player_id, connect, get_locations, get_armies, get_players,
                     army_units, army_hp, army_status_str, unit_name, building_name)
 
+from sww3bot.presentation import remaining_hours, duration_text, province_name
+
 def main():
     parser = argparse.ArgumentParser(description='Intelligence report')
     parser.add_argument('--player', type=int, help='Target player ID (default: all visible)')
@@ -17,7 +19,6 @@ def main():
     locs = get_locations(raw)
     armies = get_armies(raw)
     players = get_players(raw)
-    now_ms = time.time() * 1000
 
     # Build army-by-province map
     army_by_prov = {}
@@ -105,10 +106,10 @@ def main():
                     su = pi.get('u', {})
                     ut = su.get('unit', {}).get('t', su.get('t', 0))
                     comp = pi.get('t', 0)
-                    rem = (comp - now_ms) / 3600000
-                    prod_str = f' | [PROD] {unit_name(ut)} ({rem:.1f}h)'
+                    rem = remaining_hours(raw, comp)
+                    prod_str = f' | [PROD] {unit_name(ut)} ({duration_text(rem)})'
 
-                print(f"    P{pid} Lv{plv} M{morale}%{prod_str}")
+                print(f"    {province_name(raw, pid)} Lv{plv} M{morale}%{prod_str}")
                 if bldgs:
                     print(f"      {', '.join(bldgs)}")
 
@@ -117,7 +118,7 @@ def main():
                     for aid, a in army_by_prov[pid]:
                         units = army_units(a)
                         hp = army_hp(a)
-                        status = army_status_str(a.get('s', 0))
+                        status = army_status_str(a)
                         unit_strs = [f"{unit_name(u.get('t',0))}({u.get('hp',0):.0f}HP)" for u in units if isinstance(u, dict)]
                         print(f"      #{aid} {status} {hp:.0f}HP: {', '.join(unit_strs)}")
 
@@ -129,9 +130,9 @@ def main():
                 for aid, a in army_by_prov.get(pid, []):
                     units = army_units(a)
                     hp = army_hp(a)
-                    status = army_status_str(a.get('s', 0))
+                    status = army_status_str(a)
                     unit_strs = [f"{unit_name(u.get('t',0))}({u.get('hp',0):.0f}HP)" for u in units if isinstance(u, dict)]
-                    print(f"    P{pid} M{morale}% | #{aid} {status} {hp:.0f}HP: {', '.join(unit_strs)}")
+                    print(f"    {province_name(raw, pid)} M{morale}% | #{aid} {status} {hp:.0f}HP: {', '.join(unit_strs)}")
 
     # Summary
     total_armies = sum(1 for aid, a in armies.items() if isinstance(a, dict) and aid != '@c' and a.get('o') == active_player_id())

@@ -134,6 +134,6 @@ async def test_waiting_task_blocks_new_command_and_game_switch(bot):
 
 def test_application_wires_handlers_without_network(bot):
     app = bot.application()
-    assert len(app.handlers[0]) == 10
+    assert len(app.handlers[0]) == 24
     assert app.post_init == bot.startup
     assert app.post_stop == bot.shutdown

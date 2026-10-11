@@ -4,11 +4,12 @@
 import sys, os, json, time; sys.path.insert(0, os.path.dirname(__file__))
 from _conn import active_player_id, connect, get_locations, get_properties, building_name, unit_name
 
+from sww3bot.presentation import remaining_hours, duration_text, province_name
+
 def main():
     ctrl, ge, raw = connect()
     locs = get_locations(raw)
     props = get_properties(raw)
-    now_ms = time.time() * 1000
     
     cities = []
     for loc in locs:
@@ -25,7 +26,7 @@ def main():
         morale = city.get('m', 0)
         
         print(f"\n{'='*50}")
-        print(f"  P{pid} | Level {plv} | Morale {morale}%")
+        print(f"  {province_name(raw, pid)} | Level {plv} | Morale {morale}%")
         print(f"{'='*50}")
         
         # Buildings
@@ -48,11 +49,11 @@ def main():
                 if slot and isinstance(slot, dict):
                     su = slot.get('u', {})
                     comp = slot.get('t', 0)
-                    rem = (comp - now_ms) / 3600000
+                    rem = remaining_hours(raw, comp)
                     if not has_construction:
                         print("  [CONST] Construction:")
                         has_construction = True
-                    print(f"    Slot {i}: {building_name(su.get('id', 0))} ({rem:.1f}h remaining)")
+                    print(f"    Slot {i}: {building_name(su.get('id', 0))} ({duration_text(rem)} remaining)")
         
         # Production
         pi = city.get('pi', {})
@@ -60,8 +61,8 @@ def main():
             su = pi.get('u', {})
             ut = su.get('unit', {}).get('t', su.get('t', 0))
             comp = pi.get('t', 0)
-            rem = (comp - now_ms) / 3600000
-            print(f"  [PROD] Production: {unit_name(ut)} ({rem:.1f}h remaining)")
+            rem = remaining_hours(raw, comp)
+            print(f"  [PROD] Production: {unit_name(ut)} ({duration_text(rem)} remaining)")
         else:
             print("  [PROD] Production: IDLE")
         

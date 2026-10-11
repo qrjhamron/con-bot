@@ -16,7 +16,10 @@ import time
 import json
 import base64
 import logging
+import uuid
 from typing import Optional, List, Dict, Tuple
+from .protocol import action_result, collection
+from .presentation import province_name, remaining_hours
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +43,11 @@ def _hash_map(d=None):
     return m
 
 
-RELATION_PEACE = 0
-RELATION_RIGHT_OF_WAY = 1
-RELATION_SHARED_MAP = 2
-RELATION_SHARED_INTEL = 3
-RELATION_WAR = 4
+RELATION_PEACE = 1
+RELATION_RIGHT_OF_WAY = 3
+RELATION_SHARED_MAP = 4
+RELATION_SHARED_INTEL = 6
+RELATION_WAR = -2
 
 
 class GameController:
@@ -58,9 +61,41 @@ class GameController:
         self.client = client
         self._state_cache = None
         self._sub_action_id = 0
+        self.catalog = None
+        self._province_names = {}
+        self._names_map_id = None
+        self._names_retry_at = 0
+        self._mod_retry_at = 0
 
     def refresh_state(self) -> dict:
         self._state_cache = self.client.all_data()
+        if self.catalog and not self.catalog.game_mod and time.monotonic() >= self._mod_retry_at:
+            self._mod_retry_at = time.monotonic() + 60
+            try:
+                self.catalog.apply_game_mod(self.client.request_with_retry(11))
+            except Exception:
+                logger.warning('Konfigurasi planner belum tersedia; perhitungan yang membutuhkan config ditahan.')
+        map_data = self._state_cache.get('states', {}).get('3', {}).get('map', {})
+        map_id = map_data.get('mapID')
+        if map_id != self._names_map_id:
+            self._province_names = {}
+            self._names_map_id = map_id
+            self._names_retry_at = 0
+        if not self._province_names and time.monotonic() >= self._names_retry_at:
+            self._names_retry_at = time.monotonic() + 60
+            try:
+                full_map = self.client.map_data().get('map', {})
+                if full_map.get('mapID') == map_id:
+                    for loc in collection(full_map.get('locations')):
+                        if isinstance(loc, dict):
+                            name = loc.get('n')
+                            if isinstance(name, str) and name.strip() and not name.strip().isdigit():
+                                self._province_names[loc['id']] = name
+            except Exception:
+                logger.warning('Nama wilayah belum tersedia; pengambilan akan dicoba lagi.')
+        for loc in collection(map_data.get('locations')):
+            if isinstance(loc, dict) and loc.get('id') in self._province_names:
+                loc['name'] = self._province_names[loc['id']]
         return self._state_cache
 
     @property
@@ -77,7 +112,7 @@ class GameController:
         standard UltUpdateGameStateAction payload — not sent standalone.
         """
         self._sub_action_id += 1
-        sub_action["requestID"] = f"actionReq-{self._sub_action_id}"
+        sub_action["requestID"] = f"actionReq-{uuid.uuid4().hex}"
 
         payload = self.client._build_payload(state_type=0)
         payload["actions"] = _linked_list([sub_action])
@@ -92,7 +127,17 @@ class GameController:
         except Exception as e:
             logger.error("Action failed: %s", e)
             raise
-        return resp.json()
+        response = resp.json()
+        response['_request_id'] = sub_action['requestID']
+        return response
+
+    def _army_order(self, army, orders, attack_id=0, attack_pos=None):
+        units = collection(army.get('u'))
+        if not units:
+            raise ValueError('Daftar unit pasukan tidak tersedia; perintah tidak dikirim.')
+        return {'@c': 'a', 'id': army['id'], 's': army['s'], 'o': self.client.player_id,
+                'u': ['[Lultshared.warfare.UltUnit;', units], 'c': _linked_list(orders),
+                'au': attack_id, 'ap': attack_pos, 'ag': army.get('ag', 0), 'fm': army.get('fm', 0)}
 
     def _get_province_coords(self, province_id: int) -> Optional[dict]:
         """Get {x, y} coords for a province from cached state."""
@@ -126,31 +171,22 @@ class GameController:
             raise ValueError(f"Province {target_province} coords not found")
 
         start_pos = army.get('p', {})
-        speed = army.get('bs', 1.0)
+        if army.get('a') and self.catalog:
+            # A grounded plane's move command must be a relocation to a friendly airfield.
+            province = next((p for p in collection(self.state.get('states', {}).get('3', {}).get('map', {}).get('locations'))
+                             if p.get('id') == target_province), {})
+            airfield = any('air base' in self.catalog.name(b['id']).casefold()
+                           for b in collection(province.get('us')) if isinstance(b, dict) and 'id' in b)
+            if province.get('o') != self.client.player_id or not airfield:
+                raise ValueError('Pesawat tidak dapat menguasai provinsi. Untuk serangan udara gunakan perintah serang; relokasi memerlukan airfield sendiri.')
 
         goto_cmd = {
             "@c": "gc",
             "sp": {"x": start_pos.get('x', 0), "y": start_pos.get('y', 0)},
             "tp": {"x": target_coords['x'], "y": target_coords['y']},
-            "s": speed,
-            "st": int(time.time() * 1000),
-            "at": 0,
-            "ow": False,
-            "sf": 1,
-            "l": target_province,
-            "ia": False,
         }
 
-        army_obj = {
-            "@c": "a",
-            "id": army_id,
-            "s": army.get('s', 1),
-            "o": self.client.player_id,
-            "l": army.get('l', 0),
-            "p": start_pos,
-            "c": _linked_list([goto_cmd]),
-            "ag": army.get('ag', 0),
-        }
+        army_obj = self._army_order(army, [goto_cmd])
 
         sub_action = {
             "@c": "ultshared.action.UltArmyAction",
@@ -161,6 +197,31 @@ class GameController:
         result = self._send_sub_action(sub_action)
         logger.info("Move army %d -> province %d", army_id, target_province)
         return result
+
+    def move_armies(self, army_ids, target_province):
+        """Send one normal army action for an explicitly selected ground group."""
+        from .protocol import army_status
+        ids = list(dict.fromkeys(army_ids))
+        if not 0 < len(ids) <= 20:
+            raise ValueError('Kelompok memerlukan 1–20 pasukan.')
+        coords = self._get_province_coords(target_province)
+        if not coords:
+            raise ValueError('Koordinat tujuan kelompok tidak tersedia.')
+        entries = []
+        for aid in ids:
+            army = self._get_army(aid)
+            if not army or army.get('o') != self.client.player_id or army_status(army) != 'IDLE' or army.get('fs'):
+                raise ValueError('Kelompok harus milik sendiri dan seluruhnya idle.')
+            units = collection(army.get('u'))
+            if army.get('a') or not units or not self.catalog or not all(isinstance(u, dict) and self.catalog.domain(u.get('t', 0)) == 'land' and u.get('hp', 0) > 0 for u in units):
+                raise ValueError('Kelompok ini hanya untuk pasukan darat hidup.')
+            pos = army.get('p', {})
+            if not all(k in pos for k in ('x', 'y')):
+                raise ValueError('Posisi awal unit tidak tersedia.')
+            command = {'@c': 'gc', 'sp': dict(pos), 'tp': {'x': coords['x'], 'y': coords['y']}}
+            entries.append(self._army_order(army, [command]))
+        return self._send_sub_action({'@c': 'ultshared.action.UltArmyAction',
+                                     'armies': _linked_list(entries), 'language': 'en'})
 
     def attack_army(self, army_id: int, target_army_id: int,
                     target_pos: Optional[dict] = None) -> dict:
@@ -186,27 +247,12 @@ class GameController:
 
         attack_cmd = {
             "@c": "ac",
-            "tp": {"x": target_pos.get('x', 0), "y": target_pos.get('y', 0)},
-            "sp": {"x": start_pos.get('x', 0), "y": start_pos.get('y', 0)},
-            "s": army.get('bs', 1.0),
-            "st": int(time.time() * 1000),
-            "at": 0,
+            "targetPos": {"x": target_pos.get('x', 0), "y": target_pos.get('y', 0)},
             "targetUnitID": target_army_id,
             "userGiven": True,
         }
 
-        army_obj = {
-            "@c": "a",
-            "id": army_id,
-            "s": army.get('s', 1),
-            "o": self.client.player_id,
-            "l": army.get('l', 0),
-            "p": start_pos,
-            "c": _linked_list([attack_cmd]),
-            "au": target_army_id,
-            "ap": target_pos,
-            "ag": 1,
-        }
+        army_obj = self._army_order(army, [attack_cmd], target_army_id, target_pos)
 
         sub_action = {
             "@c": "ultshared.action.UltArmyAction",
@@ -232,26 +278,12 @@ class GameController:
 
         attack_cmd = {
             "@c": "ac",
-            "tp": {"x": target_coords['x'], "y": target_coords['y']},
-            "sp": {"x": start_pos.get('x', 0), "y": start_pos.get('y', 0)},
-            "s": army.get('bs', 1.0),
-            "st": int(time.time() * 1000),
-            "at": 0,
-            "targetUnitID": -1,
+            "targetPos": {"x": target_coords['x'], "y": target_coords['y']},
+            "targetUnitID": 0,
             "userGiven": True,
-            "l": target_province,
         }
 
-        army_obj = {
-            "@c": "a",
-            "id": army_id,
-            "s": army.get('s', 1),
-            "o": self.client.player_id,
-            "l": army.get('l', 0),
-            "p": start_pos,
-            "c": _linked_list([attack_cmd]),
-            "ag": 1,
-        }
+        army_obj = self._army_order(army, [attack_cmd], 0, target_coords)
 
         sub_action = {
             "@c": "ultshared.action.UltArmyAction",
@@ -277,7 +309,7 @@ class GameController:
         if not template:
             template = self._get_building_template(province_id, building_id)
         if not template:
-            template = {"@c": "mu", "id": building_id, "built": False, "cn": True, "e": True}
+            raise ValueError(f'Bangunan {building_id} belum tersedia di kota {province_id}; tidak mengarang template.')
 
         sub_action = {
             "@c": "ultshared.action.UltUpdateProvinceAction",
@@ -406,7 +438,7 @@ class GameController:
             relation: 0=peace, 1=ROW, 2=shared_map, 3=shared_intel, 4=war
         """
         # Server expects playerB as array and relationType as base64-encoded byte
-        encoded_rel = base64.b64encode(bytes([relation])).decode()
+        encoded_rel = base64.b64encode(bytes([relation & 0xff])).decode()
         sub_action = {
             "@c": "ultshared.action.UltChangeRelationAction",
             "playerB": [target_player],
@@ -512,28 +544,22 @@ class GameController:
     @staticmethod
     def _extract_action_result(response: dict) -> int:
         """Extract actionResult from server response. Returns 1=success, -1=fail."""
-        inner = response.get('result', response)
-        ar = inner.get('actionResults', {})
-        for k, v in ar.items():
-            if k != '@c':
-                return v
-        return 0
+        return action_result(response, response.get('_request_id')) or 0
 
     def get_city_status(self) -> List[dict]:
         """Get production/construction status for all owned cities."""
         self.refresh_state()
         s3 = self.state['states']['3']
-        now_ms = time.time() * 1000
         cities = []
 
         for loc in s3['map']['locations'][1]:
             if not isinstance(loc, dict) or loc.get('o') != self.client.player_id:
                 continue
-            if loc.get('plv', 0) < 3:
+            if loc.get('plv', 0) < 4:
                 continue
 
             pid = loc['id']
-            city = {'id': pid, 'buildings': [], 'production': None, 'construction': [],
+            city = {'id': pid, 'name': province_name(self.state, pid), 'buildings': [], 'production': None, 'construction': [], 'time_basis': 'real_hours',
                     'free_prod_slots': 0, 'free_build_slots': 0}
 
             # Existing buildings
@@ -553,7 +579,7 @@ class GameController:
                         city['production'] = {
                             'type': unit.get('t', 0),
                             'end_time': p.get('t', 0),
-                            'remaining_h': max(0, (p.get('t', 0) - now_ms) / 3600000),
+                            'remaining_h': remaining_hours(self.state, p.get('t')),
                         }
 
             # Building construction (cos field)
@@ -567,7 +593,7 @@ class GameController:
                         city['construction'].append({
                             'id': u.get('id', 0),
                             'end_time': s.get('t', 0),
-                            'remaining_h': max(0, (s.get('t', 0) - now_ms) / 3600000),
+                            'remaining_h': remaining_hours(self.state, s.get('t')),
                         })
 
             # Available productions

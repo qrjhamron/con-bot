@@ -27,9 +27,10 @@ import time
 import logging
 import getpass
 import hashlib
+import base64
 from pathlib import Path
 from typing import Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 import requests
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class BytroAuth:
         self.user_name: Optional[str] = None
         self.auth_token: Optional[str] = None
         self.uber_auth: Optional[str] = None
+        self.uber_tstamp = None
 
     def login(self, username: str, password: str) -> dict:
         """
@@ -147,9 +149,32 @@ class BytroAuth:
         self.user_name = username
         self.auth_token = result["auth_token"]
         self.uber_auth = result.get("uber_auth")
+        self.uber_tstamp = result.get("uber_tstamp")
 
         logger.info("Logged in as %s (ID: %s)", username, self.user_id)
         return result
+
+    def lobby_request(self, action, arguments):
+        """Authenticated lobby reads, matching the shipped ingameCon client."""
+        if action not in ('getGames', 'getGame', 'getContentItems'):
+            raise ValueError('Only read-only lobby requests are supported')
+        if not self.uber_auth or not self.uber_tstamp:
+            raise AuthError('Authenticated lobby session unavailable')
+        values = dict(arguments)
+        values.update(authTstamp=self.uber_tstamp, authUserID=self.user_id, source='browser-desktop')
+        raw = '&'.join(f'{k}={v}' for k, v in values.items())
+        encoded = '&'.join(quote(str(k), safe="~!*'()") + '=' + quote(str(v), safe="~!*'()")
+                           for k, v in values.items())
+        signature = hashlib.sha1(('ingameCon' + action + raw + self.uber_auth).encode()).hexdigest()
+        response = self.session.post(self.base_url + '/index.php', params={
+            'action': action, 'eID': 'api', 'key': 'ingameCon', 'hash': signature,
+            'outputFormat': 'json', 'apiVersion': '20141208', 'L': 0, 'source': 'browser-desktop'},
+            data={'data': base64.b64encode(encoded.encode()).decode()}, timeout=25)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('resultCode') != 0:
+            raise AuthError('Lobby read rejected by server')
+        return data.get('result')
 
     def get_game_auth(self, game_id: int, player_id: int = 0) -> dict:
         """Fetch fresh auth tokens for a specific game + player.

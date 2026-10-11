@@ -5,18 +5,19 @@ import sys, os, time; sys.path.insert(0, os.path.dirname(__file__))
 from _conn import (active_player_id, connect, get_locations, get_armies, get_players,
                     army_units, army_hp, army_status_str, unit_name)
 
+from sww3bot.presentation import remaining_hours, duration_text, province_name
+
 def main():
     ctrl, ge, raw = connect()
     locs = get_locations(raw)
     armies = get_armies(raw)
     players = get_players(raw)
-    now_ms = time.time() * 1000
 
     # Game info
     s12 = raw.get('states', {}).get('12', {})
     day = s12.get('dayOfGame', '?')
     next_day = s12.get('nextDayTime', 0)
-    hrs_to_day = (next_day - now_ms) / 3600000 if next_day > 0 else 0
+    hrs_to_day = remaining_hours(raw, next_day) if next_day > 0 else 0
 
     # Our info
     p88 = players.get(active_player_id(), {})
@@ -37,7 +38,7 @@ def main():
 
     print(f"SUPREMACY WW3 DASHBOARD")
     print(f"Day {day} | {players.get(active_player_id(), {}).get('nationName', '')} (P{active_player_id()})")
-    print(f"VP: {vp} | Provinces: {our_provs} | Next day: {hrs_to_day:.0f}h")
+    print(f"VP: {vp} | Provinces: {our_provs} | Next day: {duration_text(hrs_to_day)}")
     print()
 
     print("Resources:")
@@ -78,10 +79,10 @@ def main():
             su = pi.get('u', {})
             ut = su.get('unit', {}).get('t', su.get('t', 0))
             comp = pi.get('t', 0)
-            rem = (comp - now_ms) / 3600000
-            print(f"  P{pid}: {unit_name(ut)} ({rem:.1f}h)")
+            rem = remaining_hours(raw, comp)
+            print(f"  {province_name(raw, pid)}: {unit_name(ut)} ({duration_text(rem)})")
         else:
-            print(f"  P{pid}: idle")
+            print(f"  {province_name(raw, pid)}: idle")
     print()
 
     nr = raw.get('states', {}).get('5', {}).get('relations', {}).get('neighborRelations', {})
@@ -105,7 +106,7 @@ def main():
     if not war_pids:
         print("  None")
     for pid in sorted(war_pids):
-        nation = players.get(pid, {}).get('nationName', f'P{pid}')
+        nation = players.get(pid, {}).get('nationName', f'{province_name(raw, pid)}')
         ep = sum(1 for l in locs if isinstance(l, dict) and l.get('o') == pid)
         print(f"  vs {nation} ({ep} provs)")
 

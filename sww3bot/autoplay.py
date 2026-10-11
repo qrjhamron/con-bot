@@ -10,6 +10,7 @@ Periodically polls game state and executes:
 - Threat detection & response
 """
 
+from .presentation import remaining_hours, duration_text
 import time
 import json
 import math
@@ -743,15 +744,15 @@ class AutoPlayer:
                 prod_items = []
                 for item in prod['items']:
                     if item:
-                        remaining = (item['end_time'] - time.time() * 1000) / 3600000
-                        prod_items.append(f"T{item['unit_type']}({remaining:.1f}h)")
+                        remaining = remaining_hours(self.ctrl.state, item['end_time'])
+                        prod_items.append(f"T{item['unit_type']}({duration_text(remaining)})")
                     else:
                         prod_items.append("")
                 bld_items = []
                 for item in construction['items']:
                     if item:
-                        remaining = (item['end_time'] - time.time() * 1000) / 3600000
-                        bld_items.append(f"[B]#{item['upgrade_id']}({remaining:.1f}h)")
+                        remaining = remaining_hours(self.ctrl.state, item['end_time'])
+                        bld_items.append(f"[B]#{item['upgrade_id']}({duration_text(remaining)})")
                 lines.append(f"   P{prov['id']}: prod=[{' '.join(prod_items)}] bld=[{' '.join(bld_items)}]")
 
         # Research
@@ -760,9 +761,9 @@ class AutoPlayer:
                      f"{research['slots']} slots free, "
                      f"{len(research['completed'])} completed")
         for r in research['current']:
-            remaining = (r.get('endTime', 0) - time.time() * 1000) / 3600000
+            remaining = remaining_hours(self.ctrl.state, r.get('endTime'))
             lines.append(f"   Researching type {r.get('researchTypeID')}"
-                        f" ({remaining:.1f}h)")
+                        f" ({duration_text(remaining)})")
 
         # Wars & Diplomacy
         wars = self._get_wars()

@@ -139,6 +139,7 @@ class SupremacyWW3:
         """
         payload = {
             "@c": "ultshared.action.UltUpdateGameStateAction",
+            "language": "en",
             "playerID": self.player_id,
             "gameID": int(self.game_id) if isinstance(self.game_id, str) else self.game_id,
             "tstamp": int(self.auth_tstamp) if self.auth_tstamp else int(time.time()),

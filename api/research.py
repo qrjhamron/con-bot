@@ -4,6 +4,8 @@
 import argparse, sys, os, time; sys.path.insert(0, os.path.dirname(__file__))
 from _conn import connect
 
+from sww3bot.presentation import remaining_hours, duration_text, province_name
+
 def main():
     parser = argparse.ArgumentParser(description='Research technology')
     parser.add_argument('research_id', type=int, nargs='?', help='Research ID to start')
@@ -12,7 +14,6 @@ def main():
     args = parser.parse_args()
 
     ctrl, ge, raw = connect()
-    now_ms = time.time() * 1000
     
     if args.list or args.research_id is None:
         # Show current research from state 23
@@ -26,8 +27,8 @@ def main():
                 if isinstance(r, dict):
                     rid = r.get('researchTypeID', '?')
                     end_t = r.get('endTime', 0)
-                    rem = (end_t - now_ms) / 3600000
-                    print(f"  R{rid}: {rem:.1f}h remaining")
+                    rem = remaining_hours(raw, end_t)
+                    print(f"  R{rid}: {duration_text(rem)} remaining")
                     active_count += 1
         if active_count == 0:
             print(" No active research")

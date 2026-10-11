@@ -54,7 +54,7 @@ def main():
         for aid, a in sorted(army_list, key=lambda x: -army_hp(x[1])):
             units = army_units(a)
             hp = army_hp(a)
-            status = army_status_str(a.get('s', 0))
+            status = army_status_str(a)
             loc_id = a.get('l', 0)
             loc = loc_map.get(loc_id, {})
             loc_owner = loc.get('o', 0)

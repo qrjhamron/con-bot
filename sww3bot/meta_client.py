@@ -9,14 +9,15 @@ class MetaError(Exception):
 
 
 class MetaClient:
-    def __init__(self, api_key, transport=None):
+    def __init__(self, api_key, transport=None, reasoning_effort='high'):
+        self.reasoning_effort = reasoning_effort
         self.client = httpx.AsyncClient(
-            timeout=60, transport=transport,
+            timeout=120, transport=transport,
             headers={"Authorization": f"Bearer {api_key}"},
         )
 
     async def complete(self, messages, tools=None):
-        payload = {"model": MODEL, "messages": messages, "max_tokens": 3000}
+        payload = {"model": MODEL, "messages": messages, "max_tokens": 12000, "reasoning_effort": self.reasoning_effort}
         if tools:
             payload.update(tools=tools, tool_choice="auto", parallel_tool_calls=False)
         for attempt in range(3):

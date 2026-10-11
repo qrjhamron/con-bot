@@ -13,7 +13,10 @@ from api._conn import (connect, get_locations, get_armies, get_players,
                     get_nation_names, resolve_unit_type, resolve_building_type,
                     UNIT_NAMES, BUILDING_NAMES, UNIT_CATEGORY,
                     RESEARCH_NAMES, TERRAIN_NAMES, RELATION_NAMES)
+from api._conn import active_catalog
+from sww3bot.protocol import collection, order_summary, action_result
 
+from sww3bot.presentation import province_name, remaining_hours, duration_text
 from sww3bot.game_session import current_session
 
 
@@ -49,7 +52,6 @@ def get_status() -> dict:
     locs = get_locations(raw)
     armies_data = get_armies(raw)
     players = get_players(raw)
-    now_ms = time.time() * 1000
 
     s12 = raw.get('states', {}).get('12', {})
     day = s12.get('dayOfGame', '?')
@@ -60,7 +62,7 @@ def get_status() -> dict:
 
     res = ge.get_resources()
     resources = {}
-    for k in ['Money', 'Supplies', 'Manpower', 'Metal', 'Oil', 'Fuel', 'Electronics']:
+    for k in ['Money', 'Supplies', 'Manpower', 'Components', 'Rare Materials', 'Fuel', 'Electronics']:
         r = res.get(k, {})
         resources[k] = {
             'amount': round(r.get('amount', 0)),
@@ -77,8 +79,9 @@ def get_status() -> dict:
                     units.append({'type': unit_name(tid), 'category': unit_category(tid),
                                   'domain': unit_domain(tid), 'hp': u.get('hp', 0)})
             our_armies.append({
-                'id': int(aid), 'status': army_status_str(a.get('s', 0)),
-                'hp': round(army_hp(a)), 'units': units,
+                'id': int(aid), 'status': army_status_str(a),
+                'hp': round(army_hp(a)), 'units': units, 'orders': order_summary(a),
+                'province_id': a.get('l'), 'province_name': province_name(raw, a.get('l')),
             })
 
     cities = []
@@ -86,17 +89,18 @@ def get_status() -> dict:
         if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
-        pi = loc.get('pi')
+        entries = [p for p in collection(loc.get('prs')) if isinstance(p, dict)]
+        pi = entries[0] if entries else loc.get('pi')
         status = 'idle'
         producing = None
         if pi and isinstance(pi, dict) and pi.get('u'):
             su = pi['u']
             ut = su.get('unit', {}).get('t', su.get('t', 0))
             comp = pi.get('t', 0)
-            rem = (comp - now_ms) / 3600000
+            rem = remaining_hours(raw, comp)
             status = 'producing'
-            producing = f"{unit_name(ut)} ({rem:.1f}h)"
-        cities.append({'id': pid, 'type': city_type(loc), 'morale': loc.get('m', 0),
+            producing = f"{unit_name(ut)} ({duration_text(rem)})"
+        cities.append({'id': pid, 'name': province_name(raw, pid), 'type': city_type(loc), 'morale': loc.get('m', 0),
                        'status': status, 'producing': producing})
 
     # Wars
@@ -113,7 +117,9 @@ def get_status() -> dict:
         wars.append({'player_id': pid, 'nation': nation, 'provinces': ep})
 
     return {
-        'day': day, 'vp': vp, 'provinces': our_provs, 'speed': '4x',
+        'day': day, 'vp': vp, 'provinces': our_provs, 'time_basis': 'real_hours',
+        'nation': our_player.get('defaultNationName', our_player.get('nationName')),
+        'speed': f"{1 / s12['timeScale']:g}x" if s12.get('timeScale', 0) > 0 else 'unknown',
         'resources': resources, 'armies': our_armies, 'cities': cities,
         'wars': wars, 'goldmark': ge.get_goldmark(),
     }
@@ -170,11 +176,13 @@ def get_armies_detail() -> dict:
                 })
         result.append({
             'army_id': int(aid),
-            'status': army_status_str(a.get('s', 0)),
-            'province_id': prov_id,
+            'status': army_status_str(a),
+            'province_id': a.get('l', prov_id),
             'territory': owner_name,
             'total_hp': round(army_hp(a), 1),
             'units': units,
+            'orders': order_summary(a), 'fight_status': a.get('fs', 0),
+            'can_capture': not a.get('a') and all(unit_domain(u.get('t', 0)) == 'land' for u in army_units(a)),
         })
     return {'armies': result, 'count': len(result)}
 
@@ -184,7 +192,6 @@ def get_cities_detail() -> dict:
     ctrl, ge, raw = refresh()
     locs = get_locations(raw)
     props = get_properties(raw)
-    now_ms = time.time() * 1000
 
     result = []
     for loc in locs:
@@ -209,16 +216,17 @@ def get_cities_detail() -> dict:
                     })
 
         # Production
-        pi = loc.get('pi')
+        entries = [p for p in collection(loc.get('prs')) if isinstance(p, dict)]
+        pi = entries[0] if entries else loc.get('pi')
         prod_status = 'idle'
         producing = None
         if pi and isinstance(pi, dict) and pi.get('u'):
             su = pi['u']
             ut = su.get('unit', {}).get('t', su.get('t', 0))
             comp = pi.get('t', 0)
-            rem = (comp - now_ms) / 3600000
+            rem = remaining_hours(raw, comp)
             prod_status = 'producing'
-            producing = {'unit': unit_name(ut), 'hours_remaining': round(rem, 1)}
+            producing = {'unit': unit_name(ut), 'remaining': duration_text(rem), 'hours_remaining': round(rem, 3) if rem is not None else None}
 
         # Available productions
         p = props.get(str(pid), {})
@@ -242,11 +250,12 @@ def get_cities_detail() -> dict:
                     available_buildings.append({'id': bid, 'name': building_name(bid)})
 
         result.append({
-            'city_id': pid, 'level': loc.get('plv', 0),
+            'city_id': pid, 'city_name': province_name(raw, pid), 'level': loc.get('plv', 0),
             'type': city_type(loc), 'morale': loc.get('m', 0),
             'buildings': buildings, 'production': prod_status,
-            'producing': producing, 'available_units': available_units,
+            'producing': producing, 'time_basis': 'real_hours', 'available_units': available_units,
             'available_buildings': available_buildings[:10],
+            'construction': [p for p in collection(loc.get('cos')) if isinstance(p, dict)],
         })
     return {'cities': result, 'count': len(result)}
 
@@ -256,7 +265,7 @@ def get_resources_detail() -> dict:
     ctrl, ge, raw = refresh()
     res = ge.get_resources()
     result = {}
-    for k in ['Money', 'Supplies', 'Manpower', 'Metal', 'Oil', 'Fuel', 'Electronics']:
+    for k in ['Money', 'Supplies', 'Manpower', 'Components', 'Rare Materials', 'Fuel', 'Electronics']:
         r = res.get(k, {})
         result[k] = {
             'amount': round(r.get('amount', 0)),
@@ -305,7 +314,6 @@ def get_research_info() -> dict:
     """Get research status: active, completed, slots."""
     ctrl, ge, raw = refresh()
     s23 = raw.get('states', {}).get('23', {})
-    now_ms = time.time() * 1000
 
     current = []
     cr = s23.get('currentResearches', [])
@@ -314,19 +322,24 @@ def get_research_info() -> dict:
             if isinstance(r, dict):
                 rid = r.get('researchTypeID')
                 end = r.get('endTime', 0)
-                rem = (end - now_ms) / 3600000
+                rem = remaining_hours(raw, end)
                 current.append({'id': rid, 'name': RESEARCH_NAMES.get(rid, f'R{rid}'),
-                                'hours_remaining': round(rem, 1)})
+                                'hours_remaining': round(rem, 3) if rem is not None else None})
 
     completed_ids = [int(k) for k in s23.get('completedResearches', {}).keys() if k != '@c']
     completed = [{'id': r, 'name': RESEARCH_NAMES.get(r, f'R{r}')} for r in completed_ids]
     slots = s23.get('researchSlots', 0)
+    catalog = active_catalog()
+    if catalog:
+        for entry in current + completed:
+            entry['name'] = catalog.name(entry['id'])
 
     return {
-        'active': current,
+        'active': current, 'time_basis': 'real_hours',
         'completed': completed,
         'slots_total': slots,
         'slots_used': len(current),
+        'available': catalog.available_research(raw, _player_id()) if catalog else [],
     }
 
 
@@ -441,6 +454,12 @@ def produce_unit(city_id: int, unit_type: str) -> dict:
         'strike_fighter': 3387, 'fighter': 3387, 'bomber': 3401,
     }
     uid = type_map.get(unit_type.lower().replace(' ', '_'), None)
+    if getattr(ctrl, 'catalog', None):
+        props = raw.get('states', {}).get('3', {}).get('properties', {}).get(str(city_id), {})
+        try:
+            uid = ctrl.catalog.resolve_available(unit_type, collection(props.get('queueableProductions')), 'unit')
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}
     if uid is None:
         try:
             uid = int(unit_type)
@@ -469,6 +488,12 @@ def build_building(city_id: int, building_type: str) -> dict:
         'secret_weapons_lab': 2285, 'combat_outpost': 2240,
     }
     bid = type_map.get(building_type.lower().replace(' ', '_'), None)
+    if getattr(ctrl, 'catalog', None):
+        props = raw.get('states', {}).get('3', {}).get('properties', {}).get(str(city_id), {})
+        try:
+            bid = ctrl.catalog.resolve_available(building_type, collection(props.get('queueableUpgrades')), 'building')
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}
     if bid is None:
         try:
             bid = int(building_type)
@@ -533,7 +558,7 @@ def auto_conquer() -> dict:
         return pos.get('x', 0), pos.get('y', 0)
 
     for aid, a in armies_data.items():
-        if isinstance(a, dict) and a.get('o') == _player_id() and a.get('s') == 1:
+        if isinstance(a, dict) and a.get('o') == _player_id() and _idle_capture_army(a):
             idle.append((int(aid), a))
 
     targets = []
@@ -582,7 +607,7 @@ def auto_produce() -> dict:
         if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
-        if loc.get('pi'):
+        if loc.get('pi') or any(isinstance(p, dict) for p in collection(loc.get('prs'))):
             continue  # already producing
 
         p = props.get(str(pid), {})
@@ -591,6 +616,9 @@ def auto_produce() -> dict:
 
         priority = [10141, 3294, 3308, 3322, 3373]
         produced = False
+        if getattr(ctrl, 'catalog', None):
+            priority = [it['unit']['t'] for it in collection(qp) if isinstance(it, dict)
+                        and ctrl.catalog.domain(it.get('unit', {}).get('t', 0)) == 'land']
         for uid in priority:
             avail = any(isinstance(it, dict) and it.get('unit', {}).get('t') == uid for it in (items if isinstance(items, list) else []))
             if not avail:
@@ -623,7 +651,7 @@ def build_in_all_cities(building_type: str) -> dict:
         'bunker': 2265, 'hospital': 2290,
     }
     bid = type_map.get(building_type.lower().replace(' ', '_'))
-    if bid is None:
+    if bid is None and not getattr(ctrl, 'catalog', None):
         try:
             bid = int(building_type)
         except ValueError:
@@ -634,6 +662,13 @@ def build_in_all_cities(building_type: str) -> dict:
         if not isinstance(loc, dict) or loc.get('o') != _player_id() or loc.get('plv', 0) < 4:
             continue
         pid = loc.get('id', 0)
+        if getattr(ctrl, 'catalog', None):
+            props = raw.get('states', {}).get('3', {}).get('properties', {}).get(str(pid), {})
+            try:
+                bid = ctrl.catalog.resolve_available(building_type, collection(props.get('queueableUpgrades')), 'building')
+            except ValueError as exc:
+                results.append({'city_id': pid, 'success': False, 'error': str(exc)})
+                continue
         us = loc.get('us', [])
         existing = set()
         if isinstance(us, list) and len(us) > 1:
@@ -696,6 +731,10 @@ def send_message(player_id, message: str) -> dict:
 def start_research(research_id: int) -> dict:
     """Start a research by ID."""
     ctrl, ge, raw = _ensure()
+    if getattr(ctrl, 'catalog', None):
+        available = ctrl.catalog.available_research(raw, _player_id())
+        if research_id not in {r['id'] for r in available}:
+            return {'success': False, 'error': 'Riset belum tersedia atau tidak sesuai doctrine. Pilih ID dari get_research_info.'}
     try:
         r = ctrl.research(research_id)
         ar = _extract_ar(r)
@@ -797,6 +836,56 @@ def get_spy_info() -> dict:
     return {'spies': spies, 'count': len(spies)}
 
 
+def get_enemy_intel(country: str, city_id: int = None) -> dict:
+    """Read only current-day military snapshots from the game's spy report."""
+    _, _, raw = refresh()
+    pid = _resolve_player(country)
+    if pid < 0:
+        return {'error': f'Country not found: {country}'}
+    player = get_players(raw).get(pid, {})
+    report = raw.get('states', {}).get('7', {}).get('spyReport', {})
+    today = report.get('currentDay') if isinstance(report, dict) else None
+    days = collection(report.get('dailyStates')) if isinstance(report, dict) else []
+    daily = next((d for d in days if isinstance(d, dict) and d.get('day') == today), None)
+    if not daily:
+        return {'country': player.get('nationName', f'P{pid}'), 'player_id': pid,
+                'intel_available': False, 'reason': 'Tidak ada laporan intel untuk hari game ini.'}
+
+    details = collection(daily.get('detailedStates'))
+    snapshot = next((d for d in details if isinstance(d, dict) and
+                     d.get('playerID') == pid and d.get('@c', '').endswith('UltDetailedSpyState')), None)
+    if not snapshot:
+        return {'country': player.get('nationName', f'P{pid}'), 'player_id': pid,
+                'intel_available': False, 'day': today,
+                'reason': 'Tidak ada laporan militer untuk negara ini pada hari game ini.'}
+
+    army_state = snapshot.get('armyState', {})
+    armies = army_state.get('armies', {}) if isinstance(army_state, dict) else {}
+    if isinstance(armies, list):
+        armies = dict(enumerate(collection(armies)))
+    result = []
+    for aid, army in armies.items() if isinstance(armies, dict) else []:
+        if not isinstance(army, dict):
+            continue
+        province_id = army.get('l')
+        if city_id and province_id != city_id:
+            continue
+        units = []
+        for unit in army_units(army):
+            if not isinstance(unit, dict):
+                continue
+            tid = unit.get('t')
+            catalog = active_catalog()
+            units.append({'type': catalog.name(tid) if catalog and tid is not None else unit_name(tid),
+                          'count': unit.get('s', 1)})
+        result.append({'army_id': aid, 'province_id': province_id,
+                       'units': units, 'unit_count': sum(u['count'] for u in units)})
+    return {'country': player.get('nationName', f'P{pid}'), 'player_id': pid,
+            'intel_available': True, 'source': 'laporan intel game', 'day': today,
+            'city_id': city_id or None, 'armies': result, 'army_count': len(result),
+            'note': 'Snapshot laporan intel hari game ini; bukan penglihatan langsung.'}
+
+
 def offer_shared_intel(player_id) -> dict:
     """Offer shared intelligence to a player (alliance building). Accepts ID or name."""
     ctrl, ge, raw = _ensure()
@@ -839,20 +928,19 @@ def get_battle_log() -> dict:
     for aid, a in armies_data.items():
         if not isinstance(a, dict):
             continue
-        if a.get('o') == _player_id() and a.get('s') == 3:  # our ATTACKING armies
+        if a.get('o') == _player_id() and army_status_str(a) in ('ATTACKING', 'BOMBARDING'):
             target = a.get('tg', {})
             target_id = target.get('id', 0) if isinstance(target, dict) else 0
             battles.append({
                 'army_id': int(aid), 'status': 'ATTACKING',
                 'hp': round(army_hp(a), 1), 'target': target_id,
             })
-        elif a.get('o') != _player_id() and a.get('s') in (2, 3):  # enemy moving/attacking
-            owner = a.get('o', 0)
-            nation = players.get(owner, {}).get('nationName', f'P{owner}')
-            battles.append({
-                'army_id': int(aid), 'status': 'ENEMY', 'owner': nation,
-                'hp': round(army_hp(a), 1),
-            })
+    from sww3bot.tactics import visible_contacts
+    for contact in visible_contacts(current_session()):
+        if contact['source'] == 'combat':
+            battles.append({'army_id': contact['army_id'], 'status': 'ENEMY_CONTACT',
+                            'owner_id': contact['owner_id'], 'position': contact['position'],
+                            'source': contact['source']})
     return {'active_battles': battles, 'count': len(battles)}
 
 
@@ -870,22 +958,19 @@ def scan_threats() -> dict:
     avg_x = sum(l['c'].get('x', 0) for l in our_provs if isinstance(l.get('c'), dict)) / len(our_provs)
     avg_y = sum(l['c'].get('y', 0) for l in our_provs if isinstance(l.get('c'), dict)) / len(our_provs)
 
+    from sww3bot.tactics import visible_contacts, at_war
     threats = []
-    for aid, a in armies_data.items():
-        if not isinstance(a, dict) or a.get('o') == _player_id():
+    for contact in visible_contacts(current_session()):
+        owner = contact['owner_id']
+        if not at_war(raw, _player_id(), owner):
             continue
-        pos = a.get('p', {})
-        if not isinstance(pos, dict):
-            continue
-        d = math.hypot(pos.get('x', 0) - avg_x, pos.get('y', 0) - avg_y)
-        if d < 500:  # within 500px threat radius
-            owner = a.get('o', 0)
+        pos = contact['position']
+        d = math.hypot(pos['x'] - avg_x, pos['y'] - avg_y)
+        if d < 500:
             nation = players.get(owner, {}).get('nationName', f'P{owner}')
-            threats.append({
-                'army_id': int(aid), 'owner': nation, 'owner_id': owner,
-                'distance': round(d), 'hp': round(army_hp(a), 1),
-                'status': army_status_str(a.get('s', 0)),
-            })
+            threats.append({'army_id': contact['army_id'], 'owner': nation, 'owner_id': owner,
+                            'distance': round(d), 'province_id': contact['province_id'],
+                            'source': contact['source'], 'units': contact['units']})
     threats.sort(key=lambda x: x['distance'])
     return {'threats': threats[:20], 'total_nearby': len(threats)}
 
@@ -964,7 +1049,7 @@ def move_all_idle_to_target(player_id: int) -> dict:
         return {'success': False, 'error': f'{name} has no provinces'}
 
     idle = [(int(aid), a) for aid, a in armies_data.items()
-            if isinstance(a, dict) and a.get('o') == _player_id() and a.get('s') == 1]
+            if isinstance(a, dict) and a.get('o') == _player_id() and _idle_capture_army(a)]
 
     def army_pos(a):
         p = a.get('p', {})
@@ -995,12 +1080,13 @@ def move_all_idle_to_target(player_id: int) -> dict:
 
 
 def _extract_ar(response):
-    res = response.get('result', response)
-    ar = res.get('actionResults', {})
-    for k, v in ar.items():
-        if k != '@c':
-            return v
-    return 0
+    return action_result(response, response.get('_request_id')) or 0
+
+
+def _idle_capture_army(army):
+    units = [u for u in army_units(army) if isinstance(u, dict)]
+    return (army_status_str(army) == 'IDLE' and not army.get('a') and bool(units)
+            and all(unit_domain(u.get('t', 0)) == 'land' for u in units))
 
 
 TOOLS = [
@@ -1192,6 +1278,15 @@ TOOLS = [
         "description": "Get all our spy units with missions, locations, and status",
         "fn": get_spy_info,
         "parameters": {},
+    },
+    {
+        "name": "get_enemy_intel",
+        "description": "Baca laporan intel militer resmi game untuk negara musuh pada hari game ini; data snapshot, bisa filter kota dengan ID. Hanya laporan yang tercatat game, bukan pelacakan tersembunyi.",
+        "fn": get_enemy_intel,
+        "parameters": {
+            "country": {"type": "string", "description": "Nama negara atau ID pemain"},
+            "city_id": {"type": "integer", "description": "ID kota/provinsi untuk menyaring laporan (opsional; hilangkan untuk semua)"},
+        },
     },
     {
         "name": "offer_shared_intel",

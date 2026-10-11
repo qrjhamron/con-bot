@@ -13,9 +13,12 @@ from sww3bot.auth import BytroAuth
 from sww3bot.api import SupremacyWW3
 from sww3bot.controller import GameController
 from sww3bot.exploits import GameExploits
+from sww3bot.catalog import Catalog
+from sww3bot.protocol import army_status
 
 load_dotenv(Path(__file__).resolve().parents[1] / '.env', override=False)
 _active_player = ContextVar('cli_active_player', default=0)
+_active_catalog = ContextVar('cli_active_catalog', default=None)
 
 
 def active_player_id():
@@ -76,6 +79,9 @@ def connect(refresh=True, game_id=None, player_id=None, username=None, password=
     username = BOT_USER if username is None else username
     try:
         auth.login(username, BOT_PASS if password is None else password)
+        items = auth.lobby_request('getContentItems', {
+            'locale': 'en', 'units': 1, 'upgrades': 1, 'mods': 1, 'researches': 1})
+        catalog = Catalog(items)
         ga = auth.get_game_auth(game_id)
     finally:
         auth.session.close()
@@ -87,6 +93,7 @@ def connect(refresh=True, game_id=None, player_id=None, username=None, password=
     )
     try:
         ctrl = GameController(client)
+        ctrl.catalog = catalog
         raw = ctrl.refresh_state()
         resolved = discover_player(raw, auth.user_id, username, client.player_id)
         if client.player_id != resolved:
@@ -94,6 +101,7 @@ def connect(refresh=True, game_id=None, player_id=None, username=None, password=
             raw = ctrl.refresh_state()
         ge = GameExploits(ctrl)
         _active_player.set(resolved)
+        _active_catalog.set(catalog)
         return ctrl, ge, raw
     except BaseException:
         client.session.close()
@@ -142,8 +150,14 @@ def army_hp(army):
 
 
 def army_status_str(code):
-    """Convert army status code to string."""
-    return {1: 'IDLE', 2: 'MOVING', 3: 'ATTACKING', 4: 'PATROL', 6: 'TRANSIT'}.get(code, f'UNK({code})')
+    """Decode an army object; a numeric stack size cannot determine status."""
+    return army_status(code) if isinstance(code, dict) else 'UNKNOWN'
+
+
+def active_catalog():
+    from sww3bot.game_session import current_session
+    session = current_session()
+    return getattr(session.ctrl, 'catalog', None) or _active_catalog.get()
 
 
 UNIT_NAMES = {
@@ -228,16 +242,25 @@ UNIT_DOMAIN = {
 
 def unit_name(type_id):
     """Get human-readable unit name."""
+    catalog = active_catalog()
+    if catalog:
+        return catalog.name(type_id)
     return UNIT_NAMES.get(type_id, f'Unit-T{type_id}')
 
 
 def unit_category(type_id):
     """Get unit category (infantry/armored/air/naval/etc)."""
+    catalog = active_catalog()
+    if catalog:
+        return catalog.category(type_id)
     return UNIT_CATEGORY.get(type_id, 'unknown')
 
 
 def unit_domain(type_id):
     """Get unit domain (land/air/sea/strategic)."""
+    catalog = active_catalog()
+    if catalog:
+        return catalog.domain(type_id)
     return UNIT_DOMAIN.get(unit_category(type_id), 'land')
 
 
@@ -356,6 +379,9 @@ ANNEX_BUILDING_IDS = {2242, 2243}
 
 def building_name(uid):
     """Get human-readable building name."""
+    catalog = active_catalog()
+    if catalog:
+        return catalog.name(uid)
     return BUILDING_NAMES.get(uid, f'Building-U{uid}')
 
 
@@ -433,6 +459,7 @@ def province_info(loc, owner_id=None):
             })
     return {
         'id': pid,
+        'name': loc.get('name') or (loc.get('n') if isinstance(loc.get('n'), str) and not loc.get('n').isdigit() else f'Wilayah #{pid} (nama belum tersedia)'),
         'level': plv,
         'level_str': province_level_str(plv),
         'type': city_type(loc),
