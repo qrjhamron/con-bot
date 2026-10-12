@@ -673,7 +673,10 @@ class TelegramBot:
 
         async def error_handler(update, context):
             # No raw exception logging: URLs may contain the Telegram bot token.
-            logging.getLogger(__name__).warning('Telegram update gagal diproses; jurnal tugas tersedia.')
+            err = context.error if hasattr(context, 'error') else None
+            logging.getLogger(__name__).warning(
+                'Telegram update gagal diproses (%s); jurnal tugas tersedia.',
+                type(err).__name__ if err is not None else 'unknown')
         app.add_error_handler(error_handler)
         return app
 
