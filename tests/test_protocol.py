@@ -6,7 +6,10 @@ import pytest
 
 from sww3bot.catalog import Catalog
 from sww3bot.controller import GameController
-from sww3bot.protocol import action_result, army_status, collection, verification
+from sww3bot.protocol import (
+    action_key, action_result, army_status, collection, resource_amount,
+    same_point, verification,
+)
 
 
 def sample_army():
@@ -148,3 +151,34 @@ def test_cancel_production_verifies_only_a_free_slot():
     assert verification(build_sub(mode=4), province_state(prs=['', [None]]), 7) == {
         'province_ids': [10], 'cancelled': True, 'observed': True}
     assert verification(build_sub(mode=4), province_state(prs=['', [{'u': {'unit': {'t': 3294}}}]]), 7) is None
+
+
+def test_malformed_state_never_raises_and_never_verifies():
+    # Malformed server data must fail closed (None/False), never raise and
+    # never count as observed evidence.
+    assert same_point({'x': 'a', 'y': 1}, {'x': 0, 'y': 1}) is False
+    assert same_point({'x': 0, 'y': 1}, None) is False
+    assert same_point({'x': 0, 'y': 0}, {'x': 0.5, 'y': 0.5}) is True
+    assert collection(['tag', 'not-a-list']) == []
+    assert collection({'x': 1}) == []
+    assert resource_amount({'amount0': 'junk'}, 0) == 0
+    assert resource_amount({}, 0) == 0
+    assert army_status({'fs': True}) == 'IDLE'
+    assert army_status({'fs': '2'}) == 'IDLE'
+    rel = {'@c': 'ultshared.action.UltChangeRelationAction', 'playerB': [100]}
+    assert verification(rel, {'states': {}}, 7) is None
+    assert verification(dict(rel, relationType='!!!'), {'states': {}}, 7) is None
+    assert verification(dict(rel, relationType=''), {'states': {}}, 7) is None
+    research = {'@c': 'ultshared.action.UltResearchAction'}
+    assert verification(research, {'states': {}}, 7) is None
+    assert verification(build_sub(mode=3, slot=True), province_state(cos=['', [None]]), 7) is None
+    move = {'@c': 'ultshared.action.UltArmyAction',
+            'armies': ['', [{'id': 1, 'c': ['', [{'@c': 'gc', 'tp': ['bad']}]]}]]}
+    assert action_key(move) == (
+        'ultshared.action.UltArmyAction', ((1, (('gc', None, ()),)),))
+    assert action_key({'@c': 'ultshared.action.UltArmyAction',
+                       'armies': ['', [{'id': 1, 'c': 'bad'}]]}) == (
+        'ultshared.action.UltArmyAction', ((1, ()),))
+    assert action_key({'@c': 'ultshared.action.UltUnknownAction'}) is None
+    assert action_key({'@c': 'ultshared.action.UltUpdateProvinceAction',
+                       'mode': 1, 'provinceIDs': ['', [10]], 'upgrade': 'bad'}) is None

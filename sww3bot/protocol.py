@@ -1,19 +1,25 @@
 """State and command mapping checked against the public v374.p game client."""
 import base64
+import binascii
 import math
 
 
 def collection(value):
     if isinstance(value, list):
-        if len(value) == 2 and isinstance(value[0], str) and isinstance(value[1], list):
-            return value[1]
+        if len(value) == 2 and isinstance(value[0], str):
+            # Java [tag, items] wrapper: malformed items fail closed, never
+            # leak the wrapper itself to callers expecting entry dicts.
+            return value[1] if isinstance(value[1], list) else []
         return value
     return []
 
 
 def resource_amount(entry, server_time):
     """Official client amount0 + rate * elapsed seconds, using game server time."""
-    base = float(entry.get('amount0', 0))
+    try:
+        base = float(entry.get('amount0', 0))
+    except (TypeError, ValueError):
+        base = 0.0
     try:
         elapsed = max(0, float(server_time) - float(entry['time0'])) / 1000
         change = float(entry.get('rate', 0)) * elapsed
@@ -42,6 +48,9 @@ def army_status(army):
     if first.get('@c') == 'gc' and first.get('at', 0):
         return 'MOVING'
     fight = army.get('fs', 0)
+    if isinstance(fight, bool) or not isinstance(fight, int):
+        # Malformed fight status never implies activity; fall through to orders.
+        fight = 0
     if fight in (3, 4):
         return 'PATROL'
     if fight == 2:
@@ -60,7 +69,12 @@ def same_point(a, b, tolerance=1):
         return False
     if not all(k in a and k in b for k in ('x', 'y')):
         return False
-    return math.hypot(a['x'] - b['x'], a['y'] - b['y']) <= tolerance
+    try:
+        return math.hypot(float(a['x']) - float(b['x']), float(a['y']) - float(b['y'])) <= tolerance
+    except (TypeError, ValueError):
+        # Non-numeric coordinates never count as a match; callers treat
+        # a non-match as unverified, never as verified.
+        return False
 
 
 def action_result(response, request_id=None):
@@ -141,7 +155,13 @@ def verification(sub, raw, player_id):
     if kind == 'UltChangeRelationAction':
         targets = sub.get('playerB')
         targets = targets if isinstance(targets, list) else [targets]
-        byte = base64.b64decode(sub['relationType'])[0]
+        try:
+            raw_relation = base64.b64decode(sub.get('relationType', ''))
+        except (ValueError, TypeError, binascii.Error):
+            return None
+        if not raw_relation:
+            return None
+        byte = raw_relation[0]
         relation = byte - 256 if byte >= 128 else byte
         rows = states.get('5', {}).get('relations', {}).get('neighborRelations', {})
         ours = rows.get(str(player_id), rows.get(player_id, {}))
@@ -149,7 +169,9 @@ def verification(sub, raw, player_id):
             return {'targets': targets, 'relation': relation}
     if kind == 'UltResearchAction' and not sub.get('cancel'):
         research = states.get('23', {})
-        rid = sub['researchID']
+        rid = sub.get('researchID')
+        if rid is None:
+            return None
         active = collection(research.get('currentResearches'))
         done = research.get('completedResearches', {})
         if any(r.get('researchTypeID', r.get('researchID')) == rid for r in active) or str(rid) in done:
@@ -209,7 +231,7 @@ def verification(sub, raw, player_id):
             if not isinstance(queue, list) or len(queue) < 2:
                 return None
             entries = collection(province.get(field))
-            if not isinstance(slot, int) or slot >= len(entries) or entries[slot] is not None:
+            if isinstance(slot, bool) or not isinstance(slot, int) or slot >= len(entries) or entries[slot] is not None:
                 return None
         return {'province_ids': provinces, 'cancelled': True, 'observed': True} if provinces else None
     return None
@@ -217,10 +239,19 @@ def verification(sub, raw, player_id):
 
 def action_key(sub):
     """Stable intent identity, ignoring clocks, position interpolation and HP."""
+    def pos_items(command):
+        pos = command.get('targetPos') or command.get('tp') or {}
+        if not isinstance(pos, dict):
+            return ()
+        try:
+            return tuple(sorted(pos.items(), key=repr))
+        except (TypeError, ValueError):
+            return ()
+
     kind = sub.get('@c', '')
     if kind.endswith('UltArmyAction'):
         return (kind, tuple((a.get('id'), tuple((c.get('@c'), c.get('targetUnitID'),
-                     tuple(sorted((c.get('targetPos') or c.get('tp') or {}).items()))) for c in commands(a)))
+                     pos_items(c)) for c in commands(a)))
                     for a in collection(sub.get('armies'))))
     if kind.endswith('UltChangeRelationAction'):
         targets = sub.get('playerB', [])
@@ -229,6 +260,9 @@ def action_key(sub):
         return (kind, sub.get('researchID'), sub.get('cancel', False))
     if kind.endswith('UltUpdateProvinceAction'):
         item = sub.get('upgrade', {})
+        if not isinstance(item, dict):
+            return None
+        unit = item.get('unit', {})
         return (kind, sub.get('mode'), tuple(collection(sub.get('provinceIDs'))),
-                item.get('id'), item.get('unit', {}).get('t'))
+                item.get('id'), unit.get('t') if isinstance(unit, dict) else None)
     return None

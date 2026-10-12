@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from sww3bot.agent_engine import Engine, Outcome, Runtime, TaskManager
+from sww3bot.agent_engine import SYSTEM_PROMPT, Engine, Outcome, Runtime, TaskManager
 from sww3bot.agent_tools import Registry, ToolResult
 from sww3bot.meta_client import MetaClient, MetaError
 from sww3bot.settings import MODEL, META_URL
@@ -47,6 +47,28 @@ class FakeExecutor:
 def runtime(settings, store):
     task = store.new_task(42, 'cek status')
     return Runtime(task, settings, store, AsyncMock())
+
+
+def test_doctrine_covers_war_economy_and_memory():
+    for marker in ('get_war_map', 'get_enemy_production', 'record_lesson',
+                   'Doktrin WW3 4x', 'Recruiting Office', 'morale'):
+        assert marker in SYSTEM_PROMPT
+
+
+async def test_lessons_injected_into_system_prompt(settings, store):
+    store.set_preference('lessons:42', [{'text': 'jangan serang produsen top', 'day': 5}])
+    meta = FakeMeta({'content': 'siap'})
+    engine = Engine(settings, meta, FakeExecutor(), store)
+    await engine.run(42, 'cek status', runtime(settings, store))
+    system = meta.requests[0][0]['content']
+    assert 'jangan serang produsen top' in system
+
+
+async def test_no_lessons_no_brief_block(settings, store):
+    meta = FakeMeta({'content': 'siap'})
+    engine = Engine(settings, meta, FakeExecutor(), store)
+    await engine.run(42, 'cek status', runtime(settings, store))
+    assert 'Pelajaran dari sesi lalu' not in meta.requests[0][0]['content']
 
 
 async def test_native_tool_loop_and_game_isolation(settings, store):

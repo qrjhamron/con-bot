@@ -48,6 +48,7 @@ COMMAND_HELP = """
 /military — pasukan idle dan cakupan pertahanan
 /map [negara] — kota dan homeland
 /contacts — kontak musuh yang terlihat tanpa spy
+/ghost spy|players|wars|track|find|status — intel game publik (live)
 /combat [target] — analisis tempur darat
 /coordination — progres kelompok dan rally
 /help — bantuan
@@ -61,6 +62,61 @@ QUICK_PROMPTS = {
     'military': 'Pasukan dan pertahanan gua sekarang gimana? Apa kelemahannya? Analisis aja, jangan jalankan tindakan.',
     'economy': 'Ekonomi dan resource gua gimana? Apa yang perlu dibenerin? Kasih saran aja, jangan jalankan tindakan.',
 }
+
+
+def _age_text(seconds):
+    if seconds is None or not isinstance(seconds, (int, float)):
+        return None
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f'{seconds} dtk'
+    if seconds < 3600:
+        return f'{seconds // 60} mnt'
+    return f'{seconds / 3600:.1f} jam'
+
+
+def auto_status_text(store, game_id, now=None):
+    """Ringkas status kontrol otomatis untuk /overnight, /commander, /fullauto status."""
+    from .commander_queue import TERMINAL
+    now = now if isinstance(now, (int, float)) else time.time()
+    config = store.preference('overnight_control', {})
+    mode = config.get('mode', 'economy')
+    deadline = config.get('deadline', 0)
+    remaining = (deadline - now) if isinstance(deadline, (int, float)) else 0
+    active = bool(config.get('enabled')) and remaining > 0
+    controlled = config.get('game_id')
+    gid = game_id or controlled
+    parts = [f"Kontrol {mode}: {'aktif' if active else 'nonaktif'}"]
+    if not active and config.get('reason'):
+        parts.append(f"alasan: {config['reason']}")
+    if active:
+        parts.append(f"sisa {remaining / 3600:.1f} jam")
+    if controlled:
+        if game_id and controlled != game_id:
+            parts.append(f"game kontrol {controlled}, game aktif {game_id}")
+        else:
+            parts.append(f"game {controlled}")
+    if gid:
+        try:
+            nodes = store.commander_nodes(gid)
+        except Exception:
+            nodes = []
+        pending = sum(1 for n in nodes if isinstance(n, dict) and n.get('state') not in TERMINAL)
+        try:
+            paused = bool(store.preference(f'commander_paused:{gid}', False))
+        except Exception:
+            paused = False
+        parts.append(f"antrean {pending} menunggu")
+        parts.append('jeda: ya' if paused else 'jeda: tidak')
+    if active:
+        nxt = config.get('next_check')
+        if isinstance(nxt, (int, float)) and nxt > now:
+            parts.append(f"cek berikutnya { _age_text(nxt - now)} lagi")
+    last_checked = config.get('last_checked')
+    last_result = config.get('last_result') or 'Belum ada hasil.'
+    age = _age_text(now - last_checked) if isinstance(last_checked, (int, float)) else None
+    parts.append(f"terakhir {age} lalu: {last_result}" if age else last_result)
+    return '; '.join(parts) + '.'
 
 
 def split_text(text, limit=3500):
@@ -89,6 +145,7 @@ class TelegramBot:
         self.commander_monitor = None
         self.typing_task = None
         self.selecting = False
+        self.ghost_spy = None
         self.progress_time = 0
         self.action_notice = None
         self.game_id = store.preference('game_id', settings.game_id)
@@ -299,6 +356,8 @@ class TelegramBot:
             await self.submit('Panggil get_coordinations dan ringkas fase rally, target berikutnya, serta alasan tertahan. Jangan menjalankan tindakan.')
         elif command == '/contacts':
             await self.submit('Panggil get_visible_enemy_units dan laporkan kontak saat ini terpisah dari last_seen. Fog tetap unknown. Jangan menjalankan aksi.')
+        elif command == '/ghost':
+            await self.ghost(argument)
         elif command in ('/events', '/economy', '/military'):
             tool = {'/events': 'get_game_events', '/economy': 'get_economy_plan', '/military': 'get_military_plan'}[command]
             await self.submit(f'Panggil {tool} lalu beri ringkasan saja, jangan menjalankan tindakan.')
@@ -308,6 +367,10 @@ class TelegramBot:
             await self.send('Perintah tidak dikenal. Lihat /help.')
         else:
             await self.submit(text)
+
+    async def ghost(self, argument):
+        from . import ghost_chat
+        await ghost_chat.run(self, argument)
 
     async def submit(self, text):
         if not self.game_id:
@@ -467,10 +530,7 @@ class TelegramBot:
             await self.send('Kontrol otomatis dihentikan. Pekerjaan yang sudah dikirim tetap dipantau.')
             return
         if argument.casefold() in ('', 'status'):
-            config = self.store.preference('overnight_control', {})
-            remaining = max(0, config.get('deadline', 0) - time.time()) / 3600
-            await self.send(f"Kontrol {config.get('mode', 'economy')}: {'aktif' if config.get('enabled') and remaining else 'nonaktif'}; "
-                            f"sisa {remaining:.1f} jam. " + config.get('last_result', 'Belum ada hasil.'))
+            await self.send(auto_status_text(self.store, self.game_id))
             return
         try:
             hours = float(argument)
@@ -569,7 +629,7 @@ class TelegramBot:
         app = (Application.builder().token(self.settings.telegram_bot_token.get_secret_value())
                .concurrent_updates(8).post_init(self.startup).post_stop(self.shutdown).build())
         for command in ('start', 'help', 'games', 'status', 'tasks', 'cancel', 'reset', 'auto', 'overnight',
-                        'commander', 'fullauto', 'stacks', 'air', 'occupation', 'queue', 'events', 'economy', 'military', 'map', 'contacts', 'combat', 'coordination'):
+                        'commander', 'fullauto', 'stacks', 'air', 'occupation', 'queue', 'events', 'economy', 'military', 'map', 'contacts', 'ghost', 'combat', 'coordination'):
             app.add_handler(CommandHandler(command, self.handle))
         app.add_handler(CallbackQueryHandler(self.handle))
         app.add_handler(MessageHandler(filters.TEXT, self.handle))

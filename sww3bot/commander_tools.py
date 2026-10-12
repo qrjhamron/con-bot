@@ -75,6 +75,126 @@ def get_game_events():
     return {'events': _on_loop(execution.loop, execution.runtime.store.commander_events, session.game_id)}
 
 
+def _session_raw(session):
+    raw = getattr(session, 'raw', {})
+    return raw if isinstance(raw, dict) else {}
+
+
+def get_war_map():
+    """Peta perang game aktif dari koran + relasi (-2 = WAR). Read-only."""
+    from . import ghost_chat
+    _, session = context()
+    raw = _session_raw(session)
+    wars = ghost_chat.wars_from_state(raw)
+    pairs = ghost_chat.war_graph_from_state(raw)
+    names = {}
+    for player in ghost_chat.players_from_state(raw):
+        if isinstance(player, dict) and 'player_id' in player:
+            names[str(player['player_id'])] = player.get('name', '?')
+    counts = {}
+    for first, second in pairs:
+        counts[str(first)] = counts.get(str(first), 0) + 1
+        counts[str(second)] = counts.get(str(second), 0) + 1
+    top = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:10]
+    return {'wars': wars[:15], 'war_count': len(wars), 'front_pairs': len(pairs),
+            'top_fronts': [{'player_id': pid, 'name': names.get(pid, f'ID {pid}'),
+                            'fronts': fronts} for pid, fronts in top],
+            'note': 'Korban besar = pertempuran sengit; relasi hanya mencatat tetangga.'}
+
+
+def get_enemy_production():
+    """Kapasitas produksi militer tiap negara dari bangunan terlihat. Read-only."""
+    from .ghostspy import MILITARY_BUILDINGS
+    _, session = context()
+    raw = _session_raw(session)
+    catalog = getattr(getattr(session, 'ctrl', None), 'catalog', None)
+    if catalog is None:
+        return {'error': 'Katalog game tidak tersedia.'}
+    name_cache = {}
+
+    def building_name(bid):
+        if bid not in name_cache:
+            try:
+                name_cache[bid] = catalog.name(bid)
+            except Exception:
+                name_cache[bid] = ''
+        return name_cache[bid]
+
+    states = raw.get('states', {}) if isinstance(raw.get('states'), dict) else {}
+    s3 = states.get('3', {}) if isinstance(states, dict) else {}
+    map_data = s3.get('map', {}) if isinstance(s3, dict) else {}
+    locs = map_data.get('locations', []) if isinstance(map_data, dict) else []
+    locs = locs[1] if isinstance(locs, list) and len(locs) > 1 else []
+    s1 = states.get('1', {}) if isinstance(states, dict) else {}
+    pool = s1.get('players', {}) if isinstance(s1, dict) else {}
+    nations = {}
+    for key, player in pool.items():
+        if not isinstance(player, dict):
+            continue
+        try:
+            pid = int(player.get('playerID', key))
+        except (TypeError, ValueError):
+            continue
+        nations[pid] = str(player.get('nationName', player.get('name', '?')))
+    production = {}
+    for loc in locs:
+        if not isinstance(loc, dict):
+            continue
+        try:
+            owner = int(loc.get('o', 0))
+        except (TypeError, ValueError):
+            continue
+        upgrades = loc.get('us', [])
+        entries = upgrades[1] if isinstance(upgrades, list) and len(upgrades) > 1 else []
+        for built in entries:
+            if not isinstance(built, dict):
+                continue
+            try:
+                bid = int(built.get('id', 0))
+            except (TypeError, ValueError):
+                continue
+            category = MILITARY_BUILDINGS.get(building_name(bid), '')
+            if not category:
+                continue
+            slot = production.setdefault(owner, {})
+            slot[category] = slot.get(category, 0) + 1
+    me = getattr(session, 'player_id', 0)
+    rows = [{'player_id': pid, 'nation': nations.get(pid, f'ID {pid}'),
+             'military': military, 'total': sum(military.values()),
+             'self': pid == me}
+            for pid, military in production.items()]
+    rows.sort(key=lambda r: r['total'], reverse=True)
+    return {'producers': rows[:15],
+            'note': 'Bangunan terlihat publik; isi dan level pasukan tetap butuh kontak/scout.'}
+
+
+def record_lesson(text):
+    """Catat pelajaran penting agar diingat di tugas berikut. Maks 20 per game."""
+    from .agent_tools import _on_loop
+    execution, session = context()
+    text = str(text or '').strip()[:500]
+    if not text:
+        return {'error': 'Isi pelajaran tidak boleh kosong.'}
+    store = execution.runtime.store
+    key = f'lessons:{session.game_id}'
+    lessons = _on_loop(execution.loop, store.preference, key, [])
+    lessons = [entry for entry in lessons if isinstance(entry, dict)][:19]
+    states = _session_raw(session).get('states', {})
+    day = states.get('12', {}).get('dayOfGame', 0) if isinstance(states, dict) else 0
+    lessons.append({'text': text, 'day': day if isinstance(day, int) else 0})
+    _on_loop(execution.loop, store.set_preference, key, lessons)
+    return {'recorded': text, 'lessons': len(lessons)}
+
+
+def get_lessons():
+    """Baca pelajaran yang dicatat di game aktif."""
+    from .agent_tools import _on_loop
+    execution, session = context()
+    lessons = _on_loop(execution.loop, execution.runtime.store.preference,
+                       f'lessons:{session.game_id}', [])
+    return {'lessons': lessons if isinstance(lessons, list) else []}
+
+
 def definitions():
     from .campaign import CampaignArguments
     from .combat import CombatArguments
@@ -110,6 +230,11 @@ def definitions():
         {'name': 'get_game_events', 'description': 'Baca perubahan game yang benar-benar teramati, termasuk bangunan/riset selesai, kota direbut, dan produksi kosong.', 'fn': get_game_events, 'parameters': {}},
         {'name': 'cancel_game_action', 'description': 'Batalkan satu item queue yang belum dikirim.', 'fn': cancel_game_action,
          'parameters': {'node_id': {'type': 'integer', 'description': 'ID dari get_commander_queue'}}, 'mutates': True},
+        {'name': 'get_war_map', 'description': 'Peta perang game aktif: perang koran + korban tiap pihak + front relasi terbanyak. Baca sebelum menyerang. Read-only.', 'fn': get_war_map, 'parameters': {}},
+        {'name': 'get_enemy_production', 'description': 'Kapasitas produksi militer tiap negara dari bangunan terlihat (rekrut/senjata/udara/laut) dibanding milik sendiri. Baca sebelum menyerang. Read-only.', 'fn': get_enemy_production, 'parameters': {}},
+        {'name': 'record_lesson', 'description': 'Catat pelajaran penting (taktik berhasil/gagal, perilaku musuh) agar diingat di tugas berikut. Maks 20 per game.', 'fn': record_lesson,
+         'parameters': {'text': {'type': 'string', 'description': 'Pelajaran singkat dan spesifik'}}},
+        {'name': 'get_lessons', 'description': 'Baca pelajaran yang dicatat di game aktif.', 'fn': get_lessons, 'parameters': {}},
     ]
 
 

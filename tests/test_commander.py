@@ -295,3 +295,56 @@ async def test_recovered_production_captures_future_unit_identity(commander_exec
     recovered = store.commander_node(node['id'], 42)
     assert recovered['state'] == 'accepted'
     assert recovered['baseline']['production_unit_id']
+
+
+async def test_war_map_reads_newspaper_and_relations(commander_executor, settings, store):
+    session = commander_executor.session(42)
+    link_a = "{{{countryLink 'Indonesia' '7'}}}"
+    link_b = "{{{countryLink 'Chad' '88'}}}"
+    session.raw['states']['2'] = {'articles': [
+        {'title': f'{link_a}, {link_b} at War', 'day': 3,
+         'messageBody': f'{link_a} - 10\n{link_b} - 20'}]}
+    session.raw['states']['5'] = {'relations': {'neighborRelations': {'7': {'88': -2}, '88': {'7': -2}}}}
+    result = await commander_executor.execute(42, 'get_war_map', {}, runtime(settings, store))
+    assert result.ok
+    assert result.data['war_count'] == 1
+    assert result.data['wars'][0]['a_losses'] == 10
+    assert result.data['front_pairs'] == 1
+    assert result.data['top_fronts'][0]['fronts'] == 1
+
+
+async def test_enemy_production_counts_military_buildings(commander_executor, settings, store):
+    session = commander_executor.session(42)
+    locs = session.raw['states']['3']['map']['locations'][1]
+    next(l for l in locs if l['id'] == 10)['us'] = ['', [{'id': 101}]]
+    next(l for l in locs if l['id'] == 40)['us'] = ['', [{'id': 100}, {'id': 100}]]
+    result = await commander_executor.execute(42, 'get_enemy_production', {}, runtime(settings, store))
+    assert result.ok
+    by_pid = {row['player_id']: row for row in result.data['producers']}
+    assert by_pid[88]['military'] == {'arms': 2}
+    assert by_pid[88]['self'] is False
+    assert by_pid[7]['military'] == {'recruit': 1}
+    assert by_pid[7]['self'] is True
+
+
+async def test_record_lesson_caps_and_persists(commander_executor, settings, store):
+    rt = runtime(settings, store)
+    for index in range(22):
+        result = await commander_executor.execute(42, 'record_lesson', {'text': f'pelajaran {index}'}, rt)
+        assert result.ok
+    got = await commander_executor.execute(42, 'get_lessons', {}, rt)
+    assert got.ok
+    assert len(got.data['lessons']) == 20
+    assert got.data['lessons'][-1]['text'] == 'pelajaran 21'
+    assert got.data['lessons'][-1]['day'] == 3
+    bad = await commander_executor.execute(42, 'record_lesson', {'text': '   '}, rt)
+    assert not bad.ok
+
+
+def test_format_lessons_block():
+    from sww3bot.agent_engine import format_lessons
+    assert format_lessons([]) == ''
+    assert format_lessons(None) == ''
+    assert format_lessons([{'text': '  '}, 'rusak']) == ''
+    out = format_lessons([{'text': 'jangan serang produsen top', 'day': 5}])
+    assert 'jangan serang produsen top' in out and 'hari 5' in out

@@ -134,6 +134,62 @@ async def test_waiting_task_blocks_new_command_and_game_switch(bot):
 
 def test_application_wires_handlers_without_network(bot):
     app = bot.application()
-    assert len(app.handlers[0]) == 24
+    assert len(app.handlers[0]) == 25
     assert app.post_init == bot.startup
     assert app.post_stop == bot.shutdown
+
+
+def test_auto_status_never_enabled(store):
+    from sww3bot.telegram_bot import auto_status_text
+    text = auto_status_text(store, 42, now=1000.0)
+    assert 'nonaktif' in text
+    assert 'Belum ada hasil' in text
+
+
+def test_auto_status_active_shows_queue_pause_and_next_check(store):
+    from sww3bot.telegram_bot import auto_status_text
+    now = 2000.0
+    store.set_preference('overnight_control', {
+        'enabled': True, 'mode': 'commander', 'game_id': 42,
+        'deadline': now + 7200, 'next_check': now + 240,
+        'last_checked': now - 120, 'last_result': 'Commander: 1 perintah diproses.'})
+    store.enqueue_commander(42, 7, 'build', {'city_id': 10, 'item_id': 100})
+    store.enqueue_commander(42, 7, 'produce', {'city_id': 20, 'item_id': 201})
+    store.set_preference('commander_paused:42', True)
+    text = auto_status_text(store, 42, now=now)
+    assert 'aktif' in text
+    assert 'sisa 2.0 jam' in text
+    assert 'antrean 2 menunggu' in text
+    assert 'jeda: ya' in text
+    assert 'cek berikutnya' in text
+    assert '2 mnt lalu' in text
+    assert 'Commander: 1 perintah diproses.' in text
+
+
+def test_auto_status_warns_on_game_mismatch_and_reason(store):
+    from sww3bot.telegram_bot import auto_status_text
+    now = 3000.0
+    store.set_preference('overnight_control', {
+        'enabled': False, 'mode': 'economy', 'game_id': 99,
+        'deadline': now - 10, 'reason': 'owner_stopped',
+        'last_result': 'Kontrol dihentikan.'})
+    text = auto_status_text(store, 42, now=now)
+    assert 'nonaktif' in text
+    assert 'owner_stopped' in text
+    assert 'game kontrol 99' in text
+    assert 'game aktif 42' in text
+
+
+async def test_overnight_status_reports_queue_and_pause(bot):
+    import time
+    now = time.time()
+    bot.store.set_preference('overnight_control', {
+        'enabled': True, 'mode': 'full_auto', 'game_id': 42,
+        'deadline': now + 3600, 'next_check': now + 600,
+        'last_checked': now - 30, 'last_result': 'Cek selesai.'})
+    bot.store.enqueue_commander(42, 7, 'research', {'item_id': 90})
+    await bot.overnight('status')
+    sent = bot.app.bot.send_message.call_args.kwargs['text']
+    assert 'aktif' in sent
+    assert 'antrean 1 menunggu' in sent
+    assert 'jeda: tidak' in sent

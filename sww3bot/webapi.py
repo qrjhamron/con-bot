@@ -298,7 +298,9 @@ class BytroWebAPI:
         Access game server data via token.
 
         1. Gets token for the game (getGameToken)
-        2. Uses token to query game server directly
+        2. Uses token to query game server directly as spectator
+           (Jackson WRAPPER_ARRAY envelope; plain action lists are
+           rejected with UltAuthentificationException)
 
         stateType values:
           0 = All data
@@ -314,29 +316,29 @@ class BytroWebAPI:
         if token_resp.get("resultCode") != 0:
             return token_resp
 
-        token = token_resp["result"]["token"]
-        server = token["gs"]
+        result = token_resp.get("result", {})
+        result = result if isinstance(result, dict) else {}
+        creds = dict(result)
+        nested = result.get("token", {})
+        if isinstance(nested, dict):
+            creds.update(nested)
+        server = creds.get("gs", "")
+        if not isinstance(server, str) or not server:
+            return {"resultCode": -1, "resultMessage": "token missing game server"}
+        user_auth = creds.get("auth", "") or creds.get("authHash", "")
 
-        # Direct game server request
+        # Direct game server request (spectator envelope)
         payload = {
-            "requestID": 0,
             "@c": "ultshared.action.UltUpdateGameStateAction",
-            "actions": [{
-                "requestID": "actionReq-1",
-                "@c": "ultshared.action.UltLoginAction",
-                "resolution": "1920x1080",
-            }],
-            "lastCallDuration": 0,
-            "client": "con-client-desktop",
-            "siteUserID": self.user_id,
-            "adminLevel": 0,
-            "gameID": str(game_id),
-            "playerID": 0,
             "stateType": state_type,
             "option": option,
-            "rights": token.get("rights", ""),
-            "userAuth": token["authHash"],
-            "tstamp": token["authTstamp"],
+            "actions": ["java.util.ArrayList", []],
+            "tstamp": 0,
+            "stateIDs": {"@c": "java.util.LinkedHashMap"},
+            "tstamps": {"@c": "java.util.LinkedHashMap"},
+            "gameID": game_id,
+            "playerID": 0,
+            "userAuth": user_auth,
         }
 
         try:
