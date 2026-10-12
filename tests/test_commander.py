@@ -341,6 +341,46 @@ async def test_record_lesson_caps_and_persists(commander_executor, settings, sto
     assert not bad.ok
 
 
+async def test_nation_doctrine_lookup(commander_executor, settings, store):
+    result = await commander_executor.execute(42, 'get_nation_doctrine', {'nation': 'Indonesia'}, runtime(settings, store))
+    assert result.ok
+    doctrine = result.data['doctrine']
+    assert doctrine['pid'] == 7 and doctrine['archetype'] == 'major'
+    assert doctrine['start_provinces'] == 53 and doctrine['day13_vp'] > 0
+    assert len(doctrine['opening']) == 3 and len(doctrine['priorities']) == 3
+    unknown = await commander_executor.execute(42, 'get_nation_doctrine', {'nation': 'Atlantis'}, runtime(settings, store))
+    assert not unknown.ok
+
+
+def test_doctrine_module_contract():
+    from sww3bot.ww3_doctrine import NATIONS, SOURCE, get_doctrine
+    assert len(NATIONS) > 100
+    assert SOURCE['start_game'] == 10928419 and SOURCE['end_game'] == 10925912
+    required = {'pid', 'archetype', 'start_provinces', 'start_income', 'start_vp',
+                'day13_vp', 'day13_provinces', 'opening', 'priorities', 'benchmark'}
+    for name, entry in NATIONS.items():
+        assert required <= set(entry.keys()), name
+        assert entry['archetype'] in ('superpower', 'major', 'regional', 'minor')
+    assert get_doctrine('  indonesia ')['pid'] == 7
+    assert get_doctrine(22)['pid'] == 22
+    assert get_doctrine('7')['pid'] == 7
+    assert get_doctrine('Atlantis') is None
+    assert get_doctrine(True) is None
+
+
+async def test_set_doctrine_nation_and_injection(commander_executor, settings, store):
+    from sww3bot.agent_engine import format_doctrine
+    rt = runtime(settings, store)
+    result = await commander_executor.execute(42, 'set_doctrine_nation', {'nation': 'Indonesia'}, rt)
+    assert result.ok
+    assert store.preference('doctrine:42') == 'Indonesia'
+    bad = await commander_executor.execute(42, 'set_doctrine_nation', {'nation': 'Atlantis'}, rt)
+    assert not bad.ok
+    block = format_doctrine('Indonesia')
+    assert 'Doktrin Indonesia (major)' in block and 'Bukaan:' in block
+    assert format_doctrine('Atlantis') == ''
+
+
 def test_format_lessons_block():
     from sww3bot.agent_engine import format_lessons
     assert format_lessons([]) == ''
@@ -348,3 +388,72 @@ def test_format_lessons_block():
     assert format_lessons([{'text': '  '}, 'rusak']) == ''
     out = format_lessons([{'text': 'jangan serang produsen top', 'day': 5}])
     assert 'jangan serang produsen top' in out and 'hari 5' in out
+
+
+async def test_season_status_tracks_gains(commander_executor, settings, store, monkeypatch):
+    import time
+
+    import sww3bot.auth as auth_module
+    import sww3bot.webapi as webapi_module
+    monkeypatch.setattr(time, 'time', lambda: 1791792000.0)
+
+    class FakeAuth:
+        def __init__(self):
+            self.user_id = 7
+            self.uber_auth = 'UH'
+            self.uber_tstamp = '123'
+            self.session = FakeSession()
+
+        def login(self, username, password):
+            return {}
+
+    class FakeSession:
+        def __init__(self):
+            self.cookies = {}
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeWeb:
+        def __init__(self, **kwargs):
+            self.session = FakeSession()
+
+        def get_user_details(self, user_id, options=None):
+            assert user_id == 7
+            return {'resultCode': 0, 'result': {
+                'rank': {'_details': {'fullTitle_default': 'Private 2nd Class'}},
+                'rankProgress': {'overallScore': 150, 'militaryScore': 50,
+                                 'economicScore': 100, 'globalRank': 1000,
+                                 'currentRankLevel': 5}}}
+
+        def _request(self, action, params):
+            if action == 'getSeasons':
+                return {'resultCode': 0, 'result': {
+                    '60': {'id': 60, 'name': 'Season 21', 'scoreType': 'military',
+                           'requiredScore': 2000, 'visible': True,
+                           'fromDate': '2026-08-19 10:15:00', 'toDate': '2026-10-19 13:00:00'}}}
+            if action == 'getSeasonUserDetails':
+                assert params == {'seasonID': 60, 'userID': 7}
+                return {'resultCode': 0, 'result': {'score': 150, 'position': 9,
+                                                    'unlockStatus': {'unlocked': False}}}
+            assert action == 'getRankingFirefly'
+            return {'resultCode': 0, 'result': {'entries': [
+                {'username': 'Top', 'overallScore': 999}]}}
+
+    monkeypatch.setattr(auth_module, 'BytroAuth', FakeAuth)
+    monkeypatch.setattr(webapi_module, 'BytroWebAPI', FakeWeb)
+    store.set_preference('season_baseline', {
+        'first': {'overall': 117, 'military': 43, 'economic': 74, 'at': '2026-01-01'},
+        'last': {'overall': 117, 'military': 43, 'economic': 74, 'at': '2026-01-01'}})
+    result = await commander_executor.execute(42, 'get_season_status', {}, runtime(settings, store))
+    assert result.ok
+    assert result.data['current']['overall'] == 150
+    assert result.data['current']['title'] == 'Private 2nd Class'
+    assert result.data['gained_total'] == {'overall': 33, 'military': 7, 'economic': 26}
+    assert result.data['weekly_leaders'][0]['username'] == 'Top'
+    assert store.preference('season_baseline')['last']['overall'] == 150
+    season_points = result.data['season_points']
+    assert season_points['season'] == 'Season 21'
+    assert season_points['score'] == 150 and season_points['needed'] == 1850
+    assert season_points['score_type'] == 'military'

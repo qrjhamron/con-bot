@@ -13,6 +13,7 @@ dependencies = [
   "pydantic>=2.8,<3",
   "python-telegram-bot>=21,<23",
   "python-dotenv>=1,<2",
+  "websocket-client>=1.9,<2",
 ]
 
 [project.optional-dependencies]

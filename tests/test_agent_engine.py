@@ -50,9 +50,13 @@ def runtime(settings, store):
 
 
 def test_doctrine_covers_war_economy_and_memory():
-    for marker in ('get_war_map', 'get_enemy_production', 'record_lesson',
-                   'Doktrin WW3 4x', 'Recruiting Office', 'morale'):
+    for marker in ('record_lesson', 'tentukan strategimu sendiri',
+                   'Diplomasi aktif'):
         assert marker in SYSTEM_PROMPT
+    for removed in ('Doktrin WW3 4x', 'Recruiting Office di semua kota',
+                    'target termurah', 'kejar requiredScore',
+                    'Jangan menyerang produsen militer teratas'):
+        assert removed not in SYSTEM_PROMPT
 
 
 async def test_lessons_injected_into_system_prompt(settings, store):
@@ -69,6 +73,14 @@ async def test_no_lessons_no_brief_block(settings, store):
     engine = Engine(settings, meta, FakeExecutor(), store)
     await engine.run(42, 'cek status', runtime(settings, store))
     assert 'Pelajaran dari sesi lalu' not in meta.requests[0][0]['content']
+
+
+async def test_doctrine_nation_injected(settings, store):
+    store.set_preference('doctrine:42', 'Indonesia')
+    meta = FakeMeta({'content': 'siap'})
+    engine = Engine(settings, meta, FakeExecutor(), store)
+    await engine.run(42, 'cek status', runtime(settings, store))
+    assert 'Doktrin Indonesia (major)' in meta.requests[0][0]['content']
 
 
 async def test_native_tool_loop_and_game_isolation(settings, store):

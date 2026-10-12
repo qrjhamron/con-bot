@@ -134,7 +134,7 @@ async def test_waiting_task_blocks_new_command_and_game_switch(bot):
 
 def test_application_wires_handlers_without_network(bot):
     app = bot.application()
-    assert len(app.handlers[0]) == 25
+    assert len(app.handlers[0]) == 27
     assert app.post_init == bot.startup
     assert app.post_stop == bot.shutdown
 
@@ -178,6 +178,19 @@ def test_auto_status_warns_on_game_mismatch_and_reason(store):
     assert 'owner_stopped' in text
     assert 'game kontrol 99' in text
     assert 'game aktif 42' in text
+
+
+async def test_overnight_accepts_48h_and_rejects_49(bot):
+    bot.game_id = 42
+    await bot.overnight('48', mode='commander')
+    sent = bot.app.bot.send_message.call_args.kwargs['text']
+    assert 'aktif 48 jam' in sent
+    assert bot.store.preference('overnight_control')['mode'] == 'commander'
+    if bot.overnight_task:
+        bot.overnight_task.cancel()
+    await bot.overnight('49', mode='commander')
+    sent = bot.app.bot.send_message.call_args.kwargs['text']
+    assert 'Maksimal 48 jam' in sent
 
 
 async def test_overnight_status_reports_queue_and_pause(bot):

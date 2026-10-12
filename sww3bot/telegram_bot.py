@@ -36,9 +36,9 @@ COMMAND_HELP = """
 /cancel [ID] — batalkan tugas
 /reset — hapus konteks percakapan game aktif
 /auto on|off — autoplay (default 30 menit)
-/overnight 8|off|status — kontrol ekonomi terbatas waktu
-/commander 8|off|status — ekonomi, produksi, riset, dan pertahanan
-/fullauto [8|off|status] — full auto reasoning high (default 8 jam)
+/overnight 48|off|status — kontrol ekonomi terbatas waktu (maks 48 jam)
+/commander 48|off|status — ekonomi, produksi, riset, dan pertahanan (maks 48 jam)
+/fullauto [48|off|status] — full auto reasoning high (default 8 jam, maks 48 jam)
 /stacks — optimizer komposisi pasukan
 /air — pangkalan, patroli dan refuel
 /occupation — insurgency dan garnisun kota
@@ -49,6 +49,8 @@ COMMAND_HELP = """
 /map [negara] — kota dan homeland
 /contacts — kontak musuh yang terlihat tanpa spy
 /ghost spy|players|wars|track|find|status — intel game publik (live)
+/season — skor season/rank + kenaikan vs baseline
+/chat [pesan] — baca chat game; isi pesan untuk kirim ke room publik
 /combat [target] — analisis tempur darat
 /coordination — progres kelompok dan rally
 /help — bantuan
@@ -358,6 +360,10 @@ class TelegramBot:
             await self.submit('Panggil get_visible_enemy_units dan laporkan kontak saat ini terpisah dari last_seen. Fog tetap unknown. Jangan menjalankan aksi.')
         elif command == '/ghost':
             await self.ghost(argument)
+        elif command == '/season':
+            await self.submit('Panggil get_season_status lalu laporkan pangkat, skor militer/ekonomi/total, kenaikan vs baseline, dan top mingguan sebagai acuan. Beri saran farm singkat. Jangan menjalankan tindakan.')
+        elif command == '/chat':
+            await self.chat(argument)
         elif command in ('/events', '/economy', '/military'):
             tool = {'/events': 'get_game_events', '/economy': 'get_economy_plan', '/military': 'get_military_plan'}[command]
             await self.submit(f'Panggil {tool} lalu beri ringkasan saja, jangan menjalankan tindakan.')
@@ -371,6 +377,37 @@ class TelegramBot:
     async def ghost(self, argument):
         from . import ghost_chat
         await ghost_chat.run(self, argument)
+
+    async def chat(self, argument):
+        import asyncio
+        from .commander_tools import _game_chat_client
+        if not self.game_id:
+            await self.send('Pilih game dengan /games ID_GAME dahulu.')
+            return
+        room = f'ingame_{self.game_id}'
+        try:
+            client = await asyncio.to_thread(_game_chat_client, self.settings, self.game_id)
+        except Exception:
+            await self.send('Gagal tersambung ke server chat. Coba lagi nanti.')
+            return
+        try:
+            if argument.strip():
+                await asyncio.to_thread(client.talk, room, argument.strip())
+                await self.send(f'Terkirim ke {room}.')
+            else:
+                await asyncio.to_thread(client.join, room)
+                messages = await asyncio.to_thread(client.read, 10)
+                if not messages:
+                    await self.send(f'{room} sepi 10 detik terakhir.')
+                    return
+                lines = [f'Chat {room}:']
+                for message in messages[-15:]:
+                    lines.append(f"[{message.get('author', '?')}] {message.get('text', '')}")
+                await self.send('\n'.join(lines))
+        except Exception:
+            await self.send('Gagal chat. Coba lagi nanti.')
+        finally:
+            client.close()
 
     async def submit(self, text):
         if not self.game_id:
@@ -534,10 +571,10 @@ class TelegramBot:
             return
         try:
             hours = float(argument)
-            if not 0 < hours <= 8 or not self.game_id or self.selecting or self.manager.busy():
+            if not 0 < hours <= 48 or not self.game_id or self.selecting or self.manager.busy():
                 raise ValueError()
         except ValueError:
-            await self.send('Gunakan /overnight 8, /overnight status, atau /overnight off. Selesaikan tugas aktif dahulu.')
+            await self.send('Gunakan /overnight 48, /overnight status, atau /overnight off. Maksimal 48 jam. Selesaikan tugas aktif dahulu.')
             return
         await self.engine.executor.validate_game(self.game_id)
         await self.stop_auto()
@@ -629,7 +666,7 @@ class TelegramBot:
         app = (Application.builder().token(self.settings.telegram_bot_token.get_secret_value())
                .concurrent_updates(8).post_init(self.startup).post_stop(self.shutdown).build())
         for command in ('start', 'help', 'games', 'status', 'tasks', 'cancel', 'reset', 'auto', 'overnight',
-                        'commander', 'fullauto', 'stacks', 'air', 'occupation', 'queue', 'events', 'economy', 'military', 'map', 'contacts', 'ghost', 'combat', 'coordination'):
+                        'commander', 'fullauto', 'stacks', 'air', 'occupation', 'queue', 'events', 'economy', 'military', 'map', 'contacts', 'ghost', 'combat', 'coordination', 'season', 'chat'):
             app.add_handler(CommandHandler(command, self.handle))
         app.add_handler(CallbackQueryHandler(self.handle))
         app.add_handler(MessageHandler(filters.TEXT, self.handle))

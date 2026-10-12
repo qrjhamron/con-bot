@@ -102,6 +102,41 @@ def get_war_map():
             'note': 'Korban besar = pertempuran sengit; relasi hanya mencatat tetangga.'}
 
 
+def set_doctrine_nation(nation):
+    """Tetapkan negara untuk doktrin prompt game aktif (nama atau playerID).
+
+    Doktrin negara itu disuntik ke setiap tugas berikut. Kosongkan dengan ''.
+    """
+    from . import ww3_doctrine
+    from .agent_tools import _on_loop
+    execution, session = context()
+    text = str(nation or '').strip()
+    if text and ww3_doctrine.get_doctrine(text) is None:
+        try:
+            pid = int(text)
+        except (TypeError, ValueError):
+            pid = None
+        if ww3_doctrine.get_doctrine(pid) is None:
+            return {'error': f'Doktrin tidak dikenal: {nation}.'}
+    _on_loop(execution.loop, execution.runtime.store.set_preference,
+             f'doctrine:{session.game_id}', text)
+    return {'doctrine_nation': text or '(kosong)'}
+
+
+def get_nation_doctrine(nation):
+    """Doktrin WW3 4x per negara dari riset live: start, benchmark day-13, bukaan, prioritas.
+
+    Terima nama negara atau playerID. Negara tak dikenal jadi error, bukan tebakan.
+    """
+    from . import ww3_doctrine
+    entry = ww3_doctrine.get_doctrine(nation)
+    if entry is None:
+        known = sorted(ww3_doctrine.NATIONS.keys())[:10]
+        return {'error': f'Doktrin tidak dikenal: {nation}. Contoh: {", ".join(known)}.'}
+    return {'doctrine': entry, 'source': ww3_doctrine.SOURCE,
+            'note': 'Angka = observasi game live; sesuaikan dengan kondisi game aktif.'}
+
+
 def get_enemy_production():
     """Kapasitas produksi militer tiap negara dari bangunan terlihat. Read-only."""
     from .ghostspy import MILITARY_BUILDINGS
@@ -195,6 +230,166 @@ def get_lessons():
     return {'lessons': lessons if isinstance(lessons, list) else []}
 
 
+def _season_web(settings):
+    """Website API terautentikasi untuk data rank akun."""
+    from .auth import BytroAuth
+    from .webapi import BytroWebAPI
+    auth = BytroAuth()
+    auth.login(settings.bot_user.get_secret_value(), settings.bot_pass.get_secret_value())
+    web = BytroWebAPI(api_key='uberCon', auth_hash=auth.uber_auth or '',
+                      auth_tstamp=str(auth.uber_tstamp or ''), user_id=auth.user_id or 0)
+    try:
+        web.session.cookies.update(auth.session.cookies)
+    except Exception:
+        pass
+    return auth, web
+
+
+def _game_chat_client(settings, game_id):
+    """ChatClient terhubung ke game sendiri; menutup oleh pemanggil."""
+    from . import chat as chat_mod
+    from .auth import BytroAuth
+    from .webapi import BytroWebAPI
+    auth = BytroAuth()
+    auth.login(settings.bot_user.get_secret_value(), settings.bot_pass.get_secret_value())
+    web = BytroWebAPI(api_key='uberCon', auth_hash=auth.uber_auth or '',
+                      auth_tstamp=str(auth.uber_tstamp or ''), user_id=auth.user_id or 0)
+    try:
+        web.session.cookies.update(auth.session.cookies)
+    except Exception:
+        pass
+    token = web.get_game_token(game_id).get('result', {}).get('token', {})
+    game_auth = auth.get_game_auth(game_id)
+    userdata = dict(game_auth) if isinstance(game_auth, dict) else {}
+    userdata['siteUserID'] = auth.user_id or 0
+    for key in ('chatAuth', 'chatAuthTstamp'):
+        if token.get(key):
+            userdata[key] = token[key]
+    mod_id = None
+    try:
+        mod = web.game_state(game_id, 11).get('result', {})
+        mod_id = mod.get('modID', None) if isinstance(mod, dict) else None
+    except Exception:
+        pass
+    client = chat_mod.ChatClient(token.get('chatServer', ''), userdata, mod_id)
+    client.connect()
+    return client
+
+
+def get_chat_messages(room=None, seconds=10):
+    """Baca chat publik game aktif. Room privat/whisper tidak dibuka. Read-only."""
+    from . import chat as chat_mod
+    execution, session = context()
+    target = room or f'ingame_{session.game_id}'
+    if not chat_mod.is_public_room(target):
+        return {'error': f'Room privat tidak dibuka: {target}'}
+    try:
+        seconds = max(3, min(30, int(seconds or 10)))
+    except (TypeError, ValueError):
+        seconds = 10
+    client = _game_chat_client(execution.executor.settings, session.game_id)
+    try:
+        client.join(target)
+        messages = client.read(seconds)
+    finally:
+        client.close()
+    return {'room': target, 'messages': messages[:30], 'count': len(messages)}
+
+
+def send_chat_message(room=None, site_user_id=0, text=''):
+    """Kirim pesan ke chat publik game aktif, atau whisper diplomasi ke pemain.
+
+    Isi tepat satu dari room / site_user_id. Whisper hanya untuk diplomasi
+    eksplisit, bukan menyadap. Tercatat di jurnal (mutates).
+    """
+    from . import chat as chat_mod
+    execution, session = context()
+    text = str(text or '').strip()
+    if not text:
+        return {'error': 'Pesan kosong.'}
+    if bool(room) == bool(site_user_id):
+        return {'error': 'Isi tepat satu: room publik atau site_user_id.'}
+    client = _game_chat_client(execution.executor.settings, session.game_id)
+    try:
+        if room:
+            request_id = client.talk(room, text)
+            return {'sent': True, 'room': room, 'request_id': request_id}
+        request_id = client.whisper(site_user_id, text)
+        return {'sent': True, 'site_user_id': int(site_user_id), 'request_id': request_id}
+    finally:
+        client.close()
+
+
+def get_season_status():
+    """Skor season/rank akun + kenaikan vs baseline tersimpan. Read-only."""
+    from . import season as season_mod
+    from .agent_tools import _on_loop
+    execution, _ = context()
+    settings = execution.executor.settings
+    auth, web = _season_web(settings)
+    try:
+        details = web.get_user_details(auth.user_id or 0, ['rank', 'rankProgress'])
+        result = details.get('result', {}) if isinstance(details, dict) else {}
+        progress = result.get('rankProgress', {}) if isinstance(result, dict) else {}
+        current = season_mod.summarize(progress)
+        rank = result.get('rank', {}) if isinstance(result, dict) else {}
+        title = ''
+        if isinstance(rank, dict):
+            details_map = rank.get('_details', {})
+            title = details_map.get('fullTitle_default', '') if isinstance(details_map, dict) else ''
+        current['title'] = title or '?'
+        leaders = []
+        board = web._request('getRankingFirefly', {'type': 'WeekRank', 'page': 0, 'numEntries': 3})
+        entries = (board.get('result', {}) or {}).get('entries', [])
+        for entry in entries if isinstance(entries, list) else []:
+            if isinstance(entry, dict):
+                leaders.append({'username': str(entry.get('username', '?'))[:32],
+                                'overall': entry.get('overallScore', 0)})
+        season_points = {'score': 0, 'position': 0, 'unlocked': False}
+        try:
+            seasons = web._request('getSeasons', {}).get('result', {})
+            active = season_mod.active_season(seasons if isinstance(seasons, dict) else {})
+        except Exception:
+            active = {}
+        if active:
+            try:
+                mine = web._request('getSeasonUserDetails',
+                                    {'seasonID': active['id'], 'userID': auth.user_id or 0})
+                result = mine.get('result', {}) if isinstance(mine, dict) else {}
+                season_points = season_mod.summarize_season_user(result if isinstance(result, dict) else {})
+            except Exception:
+                pass
+            season_points['needed'] = max(0, int(active.get('required_score', 0) or 0)
+                                          - season_points.get('score', 0))
+            season_points['season'] = active.get('name', '?')
+            season_points['score_type'] = active.get('score_type', '?')
+            season_points['ends_at'] = active.get('ends_at', '?')
+    finally:
+        try:
+            web.session.close()
+        except Exception:
+            pass
+        try:
+            auth.session.close()
+        except Exception:
+            pass
+    store = execution.runtime.store
+    baseline = _on_loop(execution.loop, store.preference, 'season_baseline', {})
+    first = baseline.get('first', {}) if isinstance(baseline, dict) else {}
+    if not first:
+        first = {'overall': current['overall'], 'military': current['military'],
+                 'economic': current['economic'], 'at': season_mod.today()}
+    _on_loop(execution.loop, store.set_preference, 'season_baseline',
+             {'first': first, 'last': {'overall': current['overall'],
+                                       'military': current['military'],
+                                       'economic': current['economic'],
+                                       'at': season_mod.today()}})
+    return {'current': current, 'gained_total': season_mod.delta(first, current),
+            'baseline_at': first.get('at', '?'), 'weekly_leaders': leaders,
+            'season_points': season_points,
+            'note': 'Skor rank dari aktivitas (ekonomi dominan); poin season dari skor tipe season aktif.'}
+
+
 def definitions():
     from .campaign import CampaignArguments
     from .combat import CombatArguments
@@ -232,9 +427,18 @@ def definitions():
          'parameters': {'node_id': {'type': 'integer', 'description': 'ID dari get_commander_queue'}}, 'mutates': True},
         {'name': 'get_war_map', 'description': 'Peta perang game aktif: perang koran + korban tiap pihak + front relasi terbanyak. Baca sebelum menyerang. Read-only.', 'fn': get_war_map, 'parameters': {}},
         {'name': 'get_enemy_production', 'description': 'Kapasitas produksi militer tiap negara dari bangunan terlihat (rekrut/senjata/udara/laut) dibanding milik sendiri. Baca sebelum menyerang. Read-only.', 'fn': get_enemy_production, 'parameters': {}},
+        {'name': 'get_nation_doctrine', 'description': 'Doktrin WW3 4x per negara dari riset live: start, benchmark, bukaan, prioritas. Baca saat merencanakan strategi negara itu. Read-only.', 'fn': get_nation_doctrine,
+         'parameters': {'nation': {'type': 'string', 'description': 'Nama negara atau playerID'}}},
+        {'name': 'set_doctrine_nation', 'description': 'Tetapkan negara untuk doktrin prompt game aktif; doktrinnya disuntik ke setiap tugas berikut. Kosongkan dengan string kosong.', 'fn': set_doctrine_nation,
+         'parameters': {'nation': {'type': 'string', 'description': 'Nama negara, playerID, atau kosong'}}},
         {'name': 'record_lesson', 'description': 'Catat pelajaran penting (taktik berhasil/gagal, perilaku musuh) agar diingat di tugas berikut. Maks 20 per game.', 'fn': record_lesson,
          'parameters': {'text': {'type': 'string', 'description': 'Pelajaran singkat dan spesifik'}}},
         {'name': 'get_lessons', 'description': 'Baca pelajaran yang dicatat di game aktif.', 'fn': get_lessons, 'parameters': {}},
+        {'name': 'get_season_status', 'description': 'Skor season/rank akun + kenaikan vs baseline + top mingguan. Dipakai untuk farm poin season. Read-only.', 'fn': get_season_status, 'parameters': {}},
+        {'name': 'get_chat_messages', 'description': 'Baca chat publik game aktif (default room ingame). Room privat tidak dibuka. Read-only.', 'fn': get_chat_messages,
+         'parameters': {'room': {'type': 'string', 'description': 'Opsional, default room game aktif'}, 'seconds': {'type': 'integer', 'description': 'Durasi dengar 3-30 detik'}}},
+        {'name': 'send_chat_message', 'description': 'Kirim pesan ke chat publik game aktif, atau whisper diplomasi (site_user_id). Isi tepat satu. Boleh dipakai berdiplomasi aktif: sapa, tawar damai/aliansi, koordinasi. Tercatat.', 'fn': send_chat_message, 'mutates': True,
+         'parameters': {'room': {'type': 'string', 'description': 'Room publik tujuan'}, 'site_user_id': {'type': 'integer', 'description': 'Target whisper'}, 'text': {'type': 'string', 'description': 'Isi pesan'}}},
     ]
 
 

@@ -55,28 +55,14 @@ Sebelum menyerang atau menaklukkan, baca get_combat_plan atau combat_preview.
 Estimasi memakai stat katalog, HP, terrain, dan kontak sah; bukan peluang menang.
 Rekomendasi recover/reinforce/scout harus dijelaskan. Tidak ada kontak bukan bukti
 wilayah kosong. Combat policy diperiksa lagi sebelum setiap pengiriman conquer.
-Sebelum menyerang, baca juga get_war_map (siapa perang dengan siapa, korban,
-front terbanyak) dan get_enemy_production (kapasitas militer musuh vs sendiri).
-Jangan menyerang produsen militer teratas di front terkuatnya tanpa keunggulan
-jelas. Musuh yang korbannya jauh lebih kecil biasanya unggul; yang kehabisan
-napas biasanya yang korbannya besar. Negara tanpa front dan produksi kecil
-adalah target termurah. Catat pelajaran penting (taktik berhasil/gagal,
-perilaku musuh) lewat record_lesson agar tidak mengulang kesalahan.
-Skenario non-WW3 (mis. Solar Flare: Refinery, tentara bayaran) punya mekanik
-khusus: baca deskripsi item katalog sebelum merencanakan, jangan asumsikan
-bangunan standar selalu terbaik.
-Doktrin WW3 4x (1 hari game = 6 jam nyata):
-bukaan hari-1 adalah Recruiting Office di semua kota (murah, ~8 menit nyata),
-lalu Arms Industry (~2 jam) untuk unit lanjutan dan Local Industry (~3 jam)
-untuk ekonomi; Air Base mahal dan lama (~6 jam), tunda sampai riset udara siap.
-Pola pemenang day-13: 150+ provinsi, morale 60+, ~20-30 bangunan militer
-(markas, senjata, udara, sedikit laut). Ekspansi cepat mengalahkan turtling,
-tapi morale di bawah 40 berisiko revolt: garnisun dan hospital sebelum lanjut.
-Komposisi tempur: infanteri sebagai tameng + artileri pendukung dari jarak jauh;
-udara superioritas menjawab artileri; bunker memperkuat pertahanan. Cek
-get_combat_plan dan konter katalog sebelum menyerang stack besar. Antrean
-bangunan, produksi, dan riset tidak boleh idle; kemenangan butuh VP, jadi
-bidik kota bervP tinggi, bukan provinsi kosong.
+Catat pelajaran penting (taktik berhasil/gagal, perilaku musuh) lewat
+record_lesson agar tidak mengulang kesalahan. Nilai setiap situasi dari data
+live (state, intel, katalog) dan tentukan strategimu sendiri.
+Diplomasi aktif: baca chat publik game lewat get_chat_messages, dan pakai
+send_chat_message untuk menyapa, menawarkan damai/aliansi, atau koordinasi
+saat menguntungkan. Sopan dan singkat; whisper hanya untuk diplomasi eksplisit.
+Strategi per negara WW3 4x: baca get_nation_doctrine untuk negara yang
+dimainkan dan tetangganya (start, benchmark, bukaan, prioritas dari riset live).
 Untuk "kumpulkan dulu", "gerak bareng", atau koordinasi, gunakan
 get_coordination_plan lalu queue_campaign dengan coordinate=true dan rally_province
 jika pengguna menyebut tempat rally. Infanteri penguasa wilayah dan artileri pendukung
@@ -118,6 +104,27 @@ Jika laporan tidak tersedia, katakan belum ada intel—jangan menebak dari pemil
 jumlah provinsi, jarak, atau data mentah unit. Jangan mengklaim radar sebagai komposisi
 unit, dan jangan mengirim mata-mata atau memakai Goldmark untuk menjawab pertanyaan.
 """
+
+
+def format_doctrine(nation_or_pid):
+    """Blok doktrin terarah untuk satu negara; tak dikenal jadi ''."""
+    from . import ww3_doctrine
+    entry = ww3_doctrine.get_doctrine(nation_or_pid)
+    if entry is None:
+        return ''
+    name = nation_or_pid
+    if not isinstance(nation_or_pid, str):
+        for candidate, item in ww3_doctrine.NATIONS.items():
+            if item.get('pid') == nation_or_pid:
+                name = candidate
+                break
+    lines = [f"Doktrin {name} ({entry.get('archetype', '?')}): "
+             f"start {entry.get('start_provinces', 0)} provinsi, "
+             f"income {entry.get('start_income', 0)}, {entry.get('start_vp', 0)} VP.",
+             f"Benchmark: {entry.get('benchmark', '-')}",
+             'Bukaan: ' + '; '.join(entry.get('opening', []) or ['-']),
+             'Prioritas: ' + '; '.join(entry.get('priorities', []) or ['-'])]
+    return '\n'.join(lines)
 
 
 def format_lessons(lessons):
@@ -223,6 +230,11 @@ class Engine:
             self.store.save_history(game_id, history)
             brief = format_lessons(self.store.preference(f'lessons:{game_id}', []))
             system = SYSTEM_PROMPT + f'\nGame aktif: {game_id}.'
+            doctrine_nation = self.store.preference(f'doctrine:{game_id}', '')
+            if doctrine_nation:
+                doctrine = format_doctrine(doctrine_nation)
+                if doctrine:
+                    system += '\n' + doctrine
             if brief:
                 system += '\nPelajaran dari sesi lalu (tepatilah, jangan ulangi kesalahan):\n' + brief
             for _ in range(max(0, self.settings.max_rounds - runtime.rounds)):
